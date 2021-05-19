@@ -66,10 +66,13 @@ public class CallNotificationSoundProvider extends ContentProvider {
 		}
 
 		try {
-			VoIPBaseService srv = VoIPBaseService.getSharedInstance();
-			if (srv != null) {
-				srv.startRingtoneAndVibration();
-			}
+			/* WTF? why this code was in openFile method? - explanation is above
+			* We can return this hack for use system call ringtone in the future
+			* */
+			// VoIPBaseService srv = VoIPBaseService.getSharedInstance();
+			// if (srv != null) {
+			// 	srv.startRingtoneAndVibration();
+			// }
 
 			ParcelFileDescriptor[] pipe = ParcelFileDescriptor.createPipe();
 			ParcelFileDescriptor.AutoCloseOutputStream outputStream = new ParcelFileDescriptor.AutoCloseOutputStream(pipe[1]);

@@ -1,0 +1,80 @@
+<?xml version="1.0" encoding="utf-8"?>
+<androidx.constraintlayout.widget.ConstraintLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent">
+
+    <LinearLayout
+        android:id="@+id/tabButtons"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal"
+        android:paddingStart="112dp"
+        android:paddingTop="48dp"
+        android:paddingEnd="0dp"
+        app:layout_constraintLeft_toLeftOf="parent"
+        app:layout_constraintTop_toTopOf="parent">
+
+        <Button
+            android:id="@+id/recentCallsButton"
+            style="@style/Widget.AppCompat.Button.Borderless"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:background="@drawable/sbdv_selector_focusable_button"
+            android:paddingStart="40dp"
+            android:paddingTop="24dp"
+            android:paddingEnd="40dp"
+            android:paddingBottom="24dp"
+            android:text="@string/sbdv_recents"
+            android:textAppearance="@style/TextAppearance.Sbdv.Button"
+            android:textColor="@color/white_alpha_96" />
+
+        <Button
+            android:id="@+id/contactsButton"
+            style="@style/Widget.AppCompat.Button.Borderless"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:background="@drawable/sbdv_selector_focusable_button"
+            android:paddingStart="40dp"
+            android:paddingTop="24dp"
+            android:paddingEnd="40dp"
+            android:paddingBottom="24dp"
+            android:text="@string/sbdv_contacts"
+            android:textAppearance="@style/TextAppearance.Sbdv.Button"
+            android:textColor="@color/white_alpha_96"/>
+
+    </LinearLayout>
+
+    <include
+        android:id="@+id/settingsButton"
+        layout="@layout/sbdv_element_round_settings_icon"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_gravity="center_vertical"
+        android:layout_marginTop="56dp"
+        android:layout_marginEnd="112dp"
+        app:layout_constraintBottom_toBottomOf="@id/tabButtons"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintTop_toTopOf="@id/tabButtons" />
+
+    <androidx.fragment.app.FragmentContainerView
+        android:id="@+id/contactsView"
+        android:name="ru.sberdevices.sbdv.contacts.ContactsFragment"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="32dp"
+        android:visibility="invisible"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintTop_toBottomOf="@+id/tabButtons" />
+
+    <androidx.fragment.app.FragmentContainerView
+        android:id="@+id/recentCallsView"
+        android:name="ru.sberdevices.sbdv.calls.RecentCallsFragment"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="32dp"
+        android:visibility="invisible"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintTop_toBottomOf="@+id/tabButtons" />
+
+</androidx.constraintlayout.widget.ConstraintLayout>

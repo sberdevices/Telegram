@@ -28,6 +28,7 @@ import android.view.animation.AccelerateInterpolator;
 import android.widget.FrameLayout;
 
 import org.telegram.messenger.AndroidUtilities;
+import org.telegram.messenger.DocumentObject;
 import org.telegram.messenger.DownloadController;
 import org.telegram.messenger.Emoji;
 import org.telegram.messenger.FileLoader;
@@ -40,6 +41,7 @@ import org.telegram.messenger.MediaController;
 import org.telegram.messenger.MessageObject;
 import org.telegram.messenger.MessagesController;
 import org.telegram.messenger.R;
+import org.telegram.messenger.SvgHelper;
 import org.telegram.messenger.UserConfig;
 import org.telegram.messenger.Utilities;
 import org.telegram.messenger.WebFile;
@@ -326,26 +328,35 @@ public class ContextLinkCell extends FrameLayout implements DownloadController.F
                 if (documentAttach != null) {
                     TLRPC.VideoSize thumb = MessageObject.getDocumentVideoThumb(documentAttach);
                     if (thumb != null) {
-                        linkImageView.setImage(ImageLocation.getForDocument(thumb, documentAttach), null, ImageLocation.getForDocument(currentPhotoObject, documentAttach), currentPhotoFilter, -1, ext, parentObject, 1);
+                        linkImageView.setImage(ImageLocation.getForDocument(thumb, documentAttach), "100_100", ImageLocation.getForDocument(currentPhotoObject, documentAttach), currentPhotoFilter, -1, ext, parentObject, 1);
                     } else {
                         ImageLocation location = ImageLocation.getForDocument(documentAttach);
                         if (isForceGif) {
                             location.imageType = FileLoader.IMAGE_TYPE_ANIMATION;
                         }
-                        linkImageView.setImage(location, null, ImageLocation.getForDocument(currentPhotoObject, documentAttach), currentPhotoFilter, documentAttach.size, ext, parentObject, 0);
+                        linkImageView.setImage(location, "100_100", ImageLocation.getForDocument(currentPhotoObject, documentAttach), currentPhotoFilter, documentAttach.size, ext, parentObject, 0);
                     }
                 } else if (webFile != null) {
-                    linkImageView.setImage(ImageLocation.getForWebFile(webFile), null, ImageLocation.getForPhoto(currentPhotoObject, photoAttach), currentPhotoFilter, -1, ext, parentObject, 1);
+                    linkImageView.setImage(ImageLocation.getForWebFile(webFile), "100_100", ImageLocation.getForPhoto(currentPhotoObject, photoAttach), currentPhotoFilter, -1, ext, parentObject, 1);
                 } else {
-                    linkImageView.setImage(ImageLocation.getForPath(urlLocation), null, ImageLocation.getForPhoto(currentPhotoObject, photoAttach), currentPhotoFilter, -1, ext, parentObject, 1);
+                    linkImageView.setImage(ImageLocation.getForPath(urlLocation), "100_100", ImageLocation.getForPhoto(currentPhotoObject, photoAttach), currentPhotoFilter, -1, ext, parentObject, 1);
                 }
             } else {
                 if (currentPhotoObject != null) {
+                    SvgHelper.SvgDrawable svgThumb = DocumentObject.getSvgThumb(documentAttach, Theme.key_windowBackgroundGray, 1.0f);
                     if (MessageObject.canAutoplayAnimatedSticker(documentAttach)) {
-                        linkImageView.setImage(ImageLocation.getForDocument(documentAttach), "80_80", ImageLocation.getForDocument(currentPhotoObject, documentAttach), currentPhotoFilterThumb, currentPhotoObject.size, null, parentObject, 0);
+                        if (svgThumb != null) {
+                            linkImageView.setImage(ImageLocation.getForDocument(documentAttach), "80_80", svgThumb, currentPhotoObject.size, ext, parentObject, 0);
+                        } else {
+                            linkImageView.setImage(ImageLocation.getForDocument(documentAttach), "80_80", ImageLocation.getForDocument(currentPhotoObject, documentAttach), currentPhotoFilterThumb, currentPhotoObject.size, ext, parentObject, 0);
+                        }
                     } else {
                         if (documentAttach != null) {
-                            linkImageView.setImage(ImageLocation.getForDocument(currentPhotoObject, documentAttach), currentPhotoFilter, ImageLocation.getForPhoto(currentPhotoObjectThumb, photoAttach), currentPhotoFilterThumb, currentPhotoObject.size, ext, parentObject, 0);
+                            if (svgThumb != null) {
+                                linkImageView.setImage(ImageLocation.getForDocument(currentPhotoObject, documentAttach), currentPhotoFilter, svgThumb, currentPhotoObject.size, ext, parentObject, 0);
+                            } else {
+                                linkImageView.setImage(ImageLocation.getForDocument(currentPhotoObject, documentAttach), currentPhotoFilter, ImageLocation.getForPhoto(currentPhotoObjectThumb, photoAttach), currentPhotoFilterThumb, currentPhotoObject.size, ext, parentObject, 0);
+                            }
                         } else {
                             linkImageView.setImage(ImageLocation.getForPhoto(currentPhotoObject, photoAttach), currentPhotoFilter, ImageLocation.getForPhoto(currentPhotoObjectThumb, photoAttach), currentPhotoFilterThumb, currentPhotoObject.size, ext, parentObject, 0);
                         }
@@ -425,8 +436,9 @@ public class ContextLinkCell extends FrameLayout implements DownloadController.F
             TLRPC.TL_message message = new TLRPC.TL_message();
             message.out = true;
             message.id = -Utilities.random.nextInt();
-            message.to_id = new TLRPC.TL_peerUser();
-            message.to_id.user_id = message.from_id = UserConfig.getInstance(currentAccount).getClientUserId();
+            message.peer_id = new TLRPC.TL_peerUser();
+            message.from_id = new TLRPC.TL_peerUser();
+            message.peer_id.user_id = message.from_id.user_id = UserConfig.getInstance(currentAccount).getClientUserId();
             message.date = (int) (System.currentTimeMillis() / 1000);
             message.message = "";
             message.media = new TLRPC.TL_messageMediaDocument();
@@ -886,7 +898,6 @@ public class ContextLinkCell extends FrameLayout implements DownloadController.F
                 }
                 if (!isLoading) {
                     buttonState = 2;
-                    radialProgress.setIcon(getIconForCurrentState(), ifSame, animated);
                 } else {
                     buttonState = 4;
                     Float progress = ImageLoader.getInstance().getFileProgress(fileName);
@@ -895,16 +906,13 @@ public class ContextLinkCell extends FrameLayout implements DownloadController.F
                     } else {
                         radialProgress.setProgress(0, animated);
                     }
-                    radialProgress.setIcon(getIconForCurrentState(), ifSame, animated);
                 }
             } else {
                 buttonState = 1;
                 Float progress = ImageLoader.getInstance().getFileProgress(fileName);
                 float setProgress = progress != null ? progress : 0;
                 radialProgress.setProgress(setProgress, false);
-                radialProgress.setIcon(getIconForCurrentState(), ifSame, animated);
             }
-            invalidate();
         } else {
             DownloadController.getInstance(currentAccount).removeLoadingFileObserver(this);
             if (documentAttachType == DOCUMENT_ATTACH_TYPE_MUSIC || documentAttachType == DOCUMENT_ATTACH_TYPE_AUDIO) {
@@ -918,9 +926,9 @@ public class ContextLinkCell extends FrameLayout implements DownloadController.F
             } else {
                 buttonState = -1;
             }
-            radialProgress.setIcon(getIconForCurrentState(), ifSame, animated);
-            invalidate();
         }
+        radialProgress.setIcon(getIconForCurrentState(), ifSame, animated);
+        invalidate();
     }
 
     public void setDelegate(ContextLinkCellDelegate contextLinkCellDelegate) {

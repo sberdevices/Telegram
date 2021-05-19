@@ -44,7 +44,6 @@ import org.telegram.messenger.MessagesController;
 import org.telegram.messenger.MessagesStorage;
 import org.telegram.messenger.NotificationCenter;
 import org.telegram.messenger.R;
-import org.telegram.messenger.SharedConfig;
 import org.telegram.messenger.UserConfig;
 import org.telegram.tgnet.TLRPC;
 import org.telegram.ui.ActionBar.ActionBar;
@@ -196,7 +195,7 @@ public class ChatEditActivity extends BaseFragment implements ImageUpdater.Image
                 return false;
             }
             if (info == null) {
-                info = MessagesStorage.getInstance(currentAccount).loadChatInfo(chatId, new CountDownLatch(1), false, false);
+                info = MessagesStorage.getInstance(currentAccount).loadChatInfo(chatId, ChatObject.isChannel(currentChat), new CountDownLatch(1), false, false);
                 if (info == null) {
                     return false;
                 }
@@ -221,7 +220,6 @@ public class ChatEditActivity extends BaseFragment implements ImageUpdater.Image
         }
         NotificationCenter.getInstance(currentAccount).removeObserver(this, NotificationCenter.chatInfoDidLoad);
         NotificationCenter.getInstance(currentAccount).removeObserver(this, NotificationCenter.updateInterfaces);
-        AndroidUtilities.removeAdjustResize(getParentActivity(), classGuid, true);
         if (nameTextView != null) {
             nameTextView.onDestroy();
         }
@@ -234,7 +232,7 @@ public class ChatEditActivity extends BaseFragment implements ImageUpdater.Image
             nameTextView.onResume();
             nameTextView.getEditText().requestFocus();
         }
-        AndroidUtilities.requestAdjustResize(getParentActivity(), classGuid, true);
+        AndroidUtilities.requestAdjustResize(getParentActivity(), classGuid);
         updateFields(true);
         imageUpdater.onResume();
     }
@@ -297,7 +295,7 @@ public class ChatEditActivity extends BaseFragment implements ImageUpdater.Image
             }
         });
 
-        SizeNotifierFrameLayout sizeNotifierFrameLayout = new SizeNotifierFrameLayout(context, SharedConfig.smoothKeyboard) {
+        SizeNotifierFrameLayout sizeNotifierFrameLayout = new SizeNotifierFrameLayout(context) {
 
             private boolean ignoreLayout;
 
@@ -311,7 +309,7 @@ public class ChatEditActivity extends BaseFragment implements ImageUpdater.Image
 
                 measureChildWithMargins(actionBar, widthMeasureSpec, 0, heightMeasureSpec, 0);
 
-                int keyboardSize = SharedConfig.smoothKeyboard ? 0 : measureKeyboardHeight();
+                int keyboardSize = measureKeyboardHeight();
                 if (keyboardSize > AndroidUtilities.dp(20)) {
                     ignoreLayout = true;
                     nameTextView.hideEmojiView();
@@ -344,7 +342,7 @@ public class ChatEditActivity extends BaseFragment implements ImageUpdater.Image
             protected void onLayout(boolean changed, int l, int t, int r, int b) {
                 final int count = getChildCount();
 
-                int keyboardSize = SharedConfig.smoothKeyboard ? 0 : measureKeyboardHeight();
+                int keyboardSize = measureKeyboardHeight();
                 int paddingBottom = keyboardSize <= AndroidUtilities.dp(20) && !AndroidUtilities.isInMultiwindow && !AndroidUtilities.isTablet() ? nameTextView.getEmojiPadding() : 0;
                 setBottomClip(paddingBottom);
 
@@ -507,7 +505,6 @@ public class ChatEditActivity extends BaseFragment implements ImageUpdater.Image
         }
 
         nameTextView = new EditTextEmoji(context, sizeNotifierFrameLayout, this, EditTextEmoji.STYLE_FRAGMENT);
-        nameTextView.setAllowSmoothKeybord(false);
         if (isChannel) {
             nameTextView.setHint(LocaleController.getString("EnterChannelName", R.string.EnterChannelName));
         } else {
@@ -1145,7 +1142,7 @@ public class ChatEditActivity extends BaseFragment implements ImageUpdater.Image
         }
         if (nameTextView != null) {
             String text = nameTextView.getText().toString();
-            if (text != null && text.length() != 0) {
+            if (text.length() != 0) {
                 args.putString("nameTextView", text);
             }
         }
@@ -1267,7 +1264,7 @@ public class ChatEditActivity extends BaseFragment implements ImageUpdater.Image
         }
 
         if (stickersCell != null) {
-            if (info.stickerset != null) {
+            if (info != null && info.stickerset != null) {
                 stickersCell.setTextAndValue(LocaleController.getString("GroupStickers", R.string.GroupStickers), info.stickerset.title, false);
             } else {
                 stickersCell.setText(LocaleController.getString("GroupStickers", R.string.GroupStickers), false);

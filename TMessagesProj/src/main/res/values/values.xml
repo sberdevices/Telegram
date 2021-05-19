@@ -2,4 +2,13 @@
 <resources>
     <bool name="isTablet">false</bool>
     <dimen name="custom_notification_corner_radius">2dip</dimen>
+
+    <dimen name="card_margin">32dp</dimen>
+    <dimen name="card_padding">32dp</dimen>
+    <dimen name="card_width">330dp</dimen>
+    <dimen name="card_recent_call_height">472dp</dimen>
+    <dimen name="card_contact_height">408dp</dimen>
+    <dimen name="card_corner_radius">40dp</dimen>
+
+    <dimen name="toggle_button_corner_radius">24dp</dimen>
 </resources>

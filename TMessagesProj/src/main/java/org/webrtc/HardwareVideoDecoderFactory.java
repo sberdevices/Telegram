@@ -33,13 +33,13 @@ public class HardwareVideoDecoderFactory extends MediaCodecVideoDecoderFactory {
             for (int a = 0; a < types.length; a++) {
                 switch (types[a]) {
                     case "video/x-vnd.on2.vp8":
-                        return config.enable_vp8_decoder;
+                        return false; // VP8 hardware decoder have issues on StarGate.
                     case "video/x-vnd.on2.vp9":
                         return config.enable_vp9_decoder;
                     case "video/avc":
-                        return config.enable_h264_decoder;
+                        return false; // H264 hardware decoder have issues on StarGate.
                     case "video/hevc":
-                        return config.enable_h265_decoder;
+                        return false; // H265 hardware decoder have issues on StarGate.
                 }
             }
             return true;

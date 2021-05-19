@@ -1,13 +1,23 @@
 package org.telegram.messenger.voip;
 
+import android.util.Log;
+
+import org.json.JSONArray;
+import org.json.JSONObject;
 import org.telegram.messenger.AndroidUtilities;
+import org.telegram.messenger.ApplicationLoader;
 import org.telegram.messenger.BuildVars;
 import org.telegram.messenger.FileLog;
+import org.telegram.messenger.SharedConfig;
+import org.webrtc.ContextUtils;
 import org.webrtc.VideoSink;
 
 import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.TimeUnit;
 
 public class NativeInstance {
+
+    private static final String TAG = "NativeInstance";
 
     private Instance.OnStateUpdatedListener onStateUpdatedListener;
     private Instance.OnSignalBarsUpdatedListener onSignalBarsUpdatedListener;
@@ -15,6 +25,20 @@ public class NativeInstance {
     private Instance.OnRemoteMediaStateUpdatedListener onRemoteMediaStateUpdatedListener;
     private long nativePtr;
     private String persistentStateFilePath;
+
+    private PayloadCallback payloadCallback;
+    private AudioLevelsCallback audioLevelsCallback;
+    private float[] temp = new float[1];
+
+    private boolean isGroup;
+
+    public interface PayloadCallback {
+        void run(int ssrc, String value);
+    }
+
+    public interface AudioLevelsCallback {
+        void run(int[] uids, float[] levels, boolean[] voice);
+    }
 
     public static NativeInstance make(String version, Instance.Config config, String path, Instance.Endpoint[] endpoints, Instance.Proxy proxy, int networkType, Instance.EncryptionKey encryptionKey, VideoSink remoteSink, long videoCapturer) {
         if (BuildVars.LOGS_ENABLED) {
@@ -27,8 +51,22 @@ public class NativeInstance {
         return instance;
     }
 
+    public static NativeInstance makeGroup(PayloadCallback payloadCallback, AudioLevelsCallback audioLevelsCallback) {
+        ContextUtils.initialize(ApplicationLoader.applicationContext);
+        NativeInstance instance = new NativeInstance();
+        instance.payloadCallback = payloadCallback;
+        instance.audioLevelsCallback = audioLevelsCallback;
+        instance.isGroup = true;
+        instance.nativePtr = makeGroupNativeInstance(instance, SharedConfig.disableVoiceAudioEffects);
+        return instance;
+    }
+
     public int getPeerCapabilities() {
         return 0;
+    }
+
+    public boolean isGroup() {
+        return isGroup;
     }
 
     public void setOnStateUpdatedListener(Instance.OnStateUpdatedListener listener) {
@@ -71,10 +109,48 @@ public class NativeInstance {
         }
     }
 
+    //group calls
+    private void onNetworkStateUpdated(boolean connected) {
+        if (onStateUpdatedListener != null) {
+            AndroidUtilities.runOnUIThread(() -> onStateUpdatedListener.onStateUpdated(connected ? 1 : 0));
+        }
+    }
 
-    private Instance.FinalState finalState;
-    private CountDownLatch stopBarrier;
+    private void onAudioLevelsUpdated(int[] uids, float[] levels, boolean[] voice) {
+        if (uids.length == 0) {
+            return;
+        }
+        AndroidUtilities.runOnUIThread(() -> audioLevelsCallback.run(uids, levels, voice));
+    }
+
+    private void onEmitJoinPayload(String ufrag, String pwd, Instance.Fingerprint[] fingerprints, int ssrc) {
+        try {
+            JSONObject json = new JSONObject();
+            json.put("ufrag", ufrag);
+            json.put("pwd", pwd);
+            JSONArray array = new JSONArray();
+            for (int a = 0; a < fingerprints.length; a++) {
+                JSONObject object = new JSONObject();
+                object.put("hash", fingerprints[a].hash);
+                object.put("fingerprint", fingerprints[a].fingerprint);
+                object.put("setup", fingerprints[a].setup);
+                array.put(object);
+            }
+            json.put("fingerprints", array);
+            json.put("ssrc", ssrc);
+            AndroidUtilities.runOnUIThread(() -> payloadCallback.run(ssrc, json.toString()));
+        } catch (Exception e) {
+            FileLog.e(e);
+        }
+    }
+
+    public native void removeSsrcs(int[] ssrcs);
+    public native void setJoinResponsePayload(String ufrag, String pwd, Instance.Fingerprint[] fingerprints, Instance.Candidate[] candidates);
+
+    private volatile Instance.FinalState finalState;
+    private volatile CountDownLatch stopBarrier;
     private void onStop(Instance.FinalState state) {
+        Log.d(TAG, "onStop(): " + state + ", ThreadId: " + Thread.currentThread().getId());
         finalState = state;
         if (stopBarrier != null) {
             stopBarrier.countDown();
@@ -82,20 +158,27 @@ public class NativeInstance {
     }
 
     public Instance.FinalState stop() {
+        Log.d(TAG, "stop(), ThreadId: " + Thread.currentThread().getId());
         stopBarrier = new CountDownLatch(1);
         stopNative();
         try {
-            stopBarrier.await();
+            boolean reachedZero = stopBarrier.await(10, TimeUnit.SECONDS);
+            Log.d(TAG, "stop() barrier reached zero: " + reachedZero + ", finalState: " + finalState);
         } catch (Exception e) {
             FileLog.e(e);
         }
         return finalState;
     }
 
+    public void stopGroup() {
+        stopGroupNative();
+    }
+
+    private static native long makeGroupNativeInstance(NativeInstance instance, boolean highQuality);
     private static native long makeNativeInstance(String version, NativeInstance instance, Instance.Config config, String persistentStateFilePath, Instance.Endpoint[] endpoints, Instance.Proxy proxy, int networkType, Instance.EncryptionKey encryptionKey, VideoSink remoteSink, long videoCapturer, float aspectRatio);
-    public static native long createVideoCapturer(VideoSink localSink);
+    public static native long createVideoCapturer(VideoSink localSink, boolean front);
     public static native void setVideoStateCapturer(long videoCapturer, int videoState);
-    public static native void switchCameraCapturer(long videoCapturer);
+    public static native void switchCameraCapturer(long videoCapturer, boolean front);
     public static native void destroyVideoCapturer(long videoCapturer);
 
     public native void setGlobalServerConfig(String serverConfigJson);
@@ -111,8 +194,9 @@ public class NativeInstance {
     public native Instance.TrafficStats getTrafficStats();
     public native byte[] getPersistentState();
     private native void stopNative();
-    public native void setupOutgoingVideo(VideoSink localSink);
-    public native void switchCamera();
+    private native void stopGroupNative();
+    public native void setupOutgoingVideo(VideoSink localSink, boolean front);
+    public native void switchCamera(boolean front);
     public native void setVideoState(int videoState);
     public native void onSignalingDataReceive(byte[] data);
 }

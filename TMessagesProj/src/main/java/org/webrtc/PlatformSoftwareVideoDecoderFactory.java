@@ -23,7 +23,24 @@ public class PlatformSoftwareVideoDecoderFactory extends MediaCodecVideoDecoderF
       new Predicate<MediaCodecInfo>() {
         @Override
         public boolean test(MediaCodecInfo arg) {
-          return MediaCodecUtils.isSoftwareOnly(arg);
+          if(!MediaCodecUtils.isSoftwareOnly(arg)) {
+              return false;
+          }
+
+          String[] types = arg.getSupportedTypes();
+          if (types == null || types.length == 0) {
+              return false;
+          }
+
+          for (int type = 0; type < types.length; type++) {
+              switch (types[type]) {
+                  case "video/avc":
+                      return false; // H264 platform software decoder have issues on StarGate.
+                  case "video/hevc":
+                      return false; // H265 platform software decoder have issues on StarGate.
+              }
+          }
+          return true;
         }
       };
 

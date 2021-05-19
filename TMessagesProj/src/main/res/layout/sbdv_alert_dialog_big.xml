@@ -1,0 +1,96 @@
+<?xml version="1.0" encoding="utf-8"?>
+<androidx.cardview.widget.CardView xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    xmlns:tools="http://schemas.android.com/tools"
+    android:layout_width="@dimen/sbdv_dialog_card_width"
+    android:layout_height="@dimen/sbdv_dialog_card_height"
+    app:cardBackgroundColor="@android:color/black"
+    app:cardCornerRadius="@dimen/sbdv_dialog_card_radius"
+    app:cardElevation="0dp">
+
+    <androidx.constraintlayout.widget.ConstraintLayout
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:background="@drawable/sbdv_dialog_background"
+        android:paddingHorizontal="@dimen/margin_default_double"
+        android:paddingVertical="@dimen/margin_default">
+
+        <TextView
+            android:id="@+id/sdbv_dialog_title"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_alignParentBottom="true"
+            android:layout_marginTop="8dp"
+            android:layout_marginBottom="24dp"
+            android:fontFamily="@font/sb_sans_regular"
+            android:letterSpacing="-0.02"
+            android:textColor="@color/sbdv_white"
+            android:textFontWeight="600"
+            android:textSize="@dimen/font_dialog_title"
+            android:textStyle="bold"
+            app:layout_constraintBottom_toTopOf="@id/sdbv_dialog_message"
+            app:layout_constraintEnd_toEndOf="parent"
+            app:layout_constraintStart_toStartOf="parent"
+            app:layout_constraintTop_toTopOf="parent"
+            tools:text="@string/LogOut"
+            tools:visibility="visible" />
+
+        <TextView
+            android:id="@+id/sdbv_dialog_message"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_alignParentBottom="true"
+            android:layout_marginBottom="@dimen/margin_default"
+            android:autoSizeMaxTextSize="@dimen/font_dialog_body"
+            android:autoSizeMinTextSize="@dimen/font_dialog_body_min"
+            android:autoSizeTextType="uniform"
+            android:fontFamily="@font/sb_sans_regular"
+            android:letterSpacing="-0.019"
+            android:textColor="@color/sbdv_white_56"
+            android:textSize="@dimen/font_dialog_body"
+            app:layout_constrainedHeight="true"
+            app:layout_constraintBottom_toTopOf="@id/sdbv_dialog_positive"
+            app:layout_constraintEnd_toEndOf="parent"
+            app:layout_constraintHeight_max="@dimen/sbdv_dialog_subtitle_max_height"
+            app:layout_constraintHeight_min="1dp"
+            app:layout_constraintStart_toStartOf="parent"
+            app:layout_constraintTop_toBottomOf="@+id/sdbv_dialog_title"
+            app:layout_goneMarginTop="@dimen/margin_default"
+            tools:text="@string/AreYouSureLogout"
+            tools:visibility="visible" />
+
+        <Button
+            android:id="@+id/sdbv_dialog_positive"
+            android:layout_width="match_parent"
+            android:layout_height="80dp"
+            android:layout_marginBottom="@dimen/margin_default_half"
+            android:background="@drawable/sbdv_positive_btn_r24_background"
+            android:fontFamily="@font/sb_sans_regular"
+            android:foreground="@drawable/sbdv_selector_focusable_button_24"
+            android:textAllCaps="false"
+            android:textColor="@color/sbdv_white"
+            android:textSize="28sp"
+            app:layout_constraintBottom_toTopOf="@+id/sdbv_dialog_negative"
+            app:layout_constraintEnd_toEndOf="parent"
+            app:layout_constraintStart_toStartOf="parent"
+            tools:text="@string/StayHere" />
+
+        <Button
+            android:id="@+id/sdbv_dialog_negative"
+            android:layout_width="match_parent"
+            android:layout_height="80dp"
+            android:layout_marginBottom="@dimen/margin_default_half"
+            android:background="@drawable/sbdv_neutral_btn_r24_background"
+            android:fontFamily="@font/sb_sans_regular"
+            android:foreground="@drawable/sbdv_selector_focusable_button_24"
+            android:textAllCaps="false"
+            android:textColor="@color/sbdv_white"
+            android:textSize="28sp"
+            app:layout_constraintBottom_toBottomOf="parent"
+            app:layout_constraintEnd_toEndOf="parent"
+            app:layout_constraintStart_toStartOf="parent"
+            tools:text="@string/LogOff" />
+
+    </androidx.constraintlayout.widget.ConstraintLayout>
+
+</androidx.cardview.widget.CardView>

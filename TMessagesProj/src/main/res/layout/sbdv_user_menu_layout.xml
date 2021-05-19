@@ -1,0 +1,66 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    xmlns:tools="http://schemas.android.com/tools"
+    android:id="@+id/logoutButtonLayout"
+    android:layout_width="680dp"
+    android:layout_height="624dp"
+    android:background="@drawable/user_menu_background"
+    android:gravity="center"
+    android:orientation="vertical"
+    android:padding="32dp">
+
+    <ru.sberdevices.sbdv.view.AvatarView
+        android:id="@+id/userMenuAvatarView"
+        android:layout_width="208dp"
+        android:layout_height="208dp"
+        android:layout_margin="16dp"
+        app:cardBackgroundColor="@color/sbdv_menu_background"
+        app:cardCornerRadius="104dp"
+        tools:src="@tools:sample/avatars" />
+
+    <TextView
+        android:id="@+id/userFullNameTextView"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_margin="8dp"
+        android:fontFamily="@font/sb_sans_regular"
+        android:gravity="center"
+        android:lineSpacingExtra="2sp"
+        android:textColor="@color/white"
+        android:textSize="40sp"
+        android:textStyle="bold"
+        tools:text="Anastasia Ширококрупногречева" />
+
+    <TextView
+        android:id="@+id/userPhoneTextView"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginBottom="8dp"
+        android:fontFamily="@font/sb_sans_regular"
+        android:gravity="center"
+        android:lineSpacingExtra="2sp"
+        android:textColor="@color/card_text_white"
+        android:textSize="28sp"
+        tools:text="8 999 999 99 99" />
+
+    <TextView
+        android:id="@+id/usernameTextView"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginBottom="32dp"
+        android:fontFamily="@font/sb_sans_regular"
+        android:gravity="center"
+        android:lineSpacingExtra="2sp"
+        android:textColor="@color/card_text_white"
+        android:textSize="28sp"
+        tools:text="#AnastasiaGrecha" />
+
+    <include
+        android:id="@+id/userMenuLogoutButtonView"
+        layout="@layout/logout_button_layout"
+        android:layout_width="584dp"
+        android:layout_height="96dp"
+        android:layout_marginTop="16dp" />
+
+</LinearLayout>

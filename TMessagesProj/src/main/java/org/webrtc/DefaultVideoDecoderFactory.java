@@ -11,6 +11,9 @@
 package org.webrtc;
 
 import androidx.annotation.Nullable;
+import androidx.lifecycle.LiveData;
+import androidx.lifecycle.MutableLiveData;
+
 import java.util.Arrays;
 import java.util.LinkedHashSet;
 
@@ -21,6 +24,9 @@ public class DefaultVideoDecoderFactory implements VideoDecoderFactory {
   private final VideoDecoderFactory hardwareVideoDecoderFactory;
   private final VideoDecoderFactory softwareVideoDecoderFactory = new SoftwareVideoDecoderFactory();
   private final @Nullable VideoDecoderFactory platformSoftwareVideoDecoderFactory;
+
+  private static MutableLiveData<VideoCodecInfo> _chosenCodec = new MutableLiveData<>();
+  public static LiveData<VideoCodecInfo> chosenDecoderCodec = _chosenCodec;
 
   /**
    * Create decoder factory using default hardware decoder factory.
@@ -45,6 +51,7 @@ public class DefaultVideoDecoderFactory implements VideoDecoderFactory {
     if (softwareDecoder == null && platformSoftwareVideoDecoderFactory != null) {
       softwareDecoder = platformSoftwareVideoDecoderFactory.createDecoder(codecType);
     }
+      _chosenCodec.postValue(codecType);
     if (hardwareDecoder != null && softwareDecoder != null) {
       // Both hardware and software supported, wrap it in a software fallback
       return new VideoDecoderFallback(

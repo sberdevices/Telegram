@@ -21,6 +21,7 @@ import android.graphics.drawable.Drawable;
 import android.os.Build;
 import android.text.InputFilter;
 import android.text.TextPaint;
+import android.util.TypedValue;
 import android.view.Gravity;
 import android.view.HapticFeedbackConstants;
 import android.view.KeyEvent;
@@ -189,7 +190,7 @@ public class PhotoAlbumPickerActivity extends BaseFragment implements Notificati
         menuItem.setContentDescription(LocaleController.getString("AccDescrMoreOptions", R.string.AccDescrMoreOptions));
         menuItem.addSubItem(1, R.drawable.msg_openin, LocaleController.getString("OpenInExternalApp", R.string.OpenInExternalApp));
 
-        sizeNotifierFrameLayout = new SizeNotifierFrameLayout(context, SharedConfig.smoothKeyboard) {
+        sizeNotifierFrameLayout = new SizeNotifierFrameLayout(context) {
 
             private int lastNotifyWidth;
             private boolean ignoreLayout;
@@ -335,7 +336,7 @@ public class PhotoAlbumPickerActivity extends BaseFragment implements Notificati
 
         emptyView = new TextView(context);
         emptyView.setTextColor(0xff808080);
-        emptyView.setTextSize(20);
+        emptyView.setTextSize(TypedValue.COMPLEX_UNIT_DIP, 20);
         emptyView.setGravity(Gravity.CENTER);
         emptyView.setVisibility(View.GONE);
         emptyView.setText(LocaleController.getString("NoPhotos", R.string.NoPhotos));
@@ -437,9 +438,6 @@ public class PhotoAlbumPickerActivity extends BaseFragment implements Notificati
             }
             TLRPC.Chat chat = chatActivity.getCurrentChat();
             TLRPC.User user = chatActivity.getCurrentUser();
-            if (chatActivity.getCurrentEncryptedChat() != null) {
-                return false;
-            }
 
             if (sendPopupLayout == null) {
                 sendPopupLayout = new ActionBarPopupWindow.ActionBarPopupWindowLayout(getParentActivity());
@@ -470,11 +468,11 @@ public class PhotoAlbumPickerActivity extends BaseFragment implements Notificati
 
                 itemCells = new ActionBarMenuSubItem[2];
                 for (int a = 0; a < 2; a++) {
-                    if (a == 1 && UserObject.isUserSelf(user)) {
+                    if (a == 0 && !chatActivity.canScheduleMessage() || a == 1 && UserObject.isUserSelf(user)) {
                         continue;
                     }
                     int num = a;
-                    itemCells[a] = new ActionBarMenuSubItem(getParentActivity());
+                    itemCells[a] = new ActionBarMenuSubItem(getParentActivity(), a == 0, a ==  1);
                     if (num == 0) {
                         if (UserObject.isUserSelf(user)) {
                             itemCells[a].setTextAndIcon(LocaleController.getString("SetReminder", R.string.SetReminder), R.drawable.msg_schedule);

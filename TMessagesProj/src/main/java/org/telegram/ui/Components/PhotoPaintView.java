@@ -458,6 +458,10 @@ public class PhotoPaintView extends FrameLayout implements EntityView.EntityView
         return toolsView;
     }
 
+    public FrameLayout getCurtainView() {
+        return curtainView;
+    }
+
     public TextView getDoneTextView() {
         return doneTextView;
     }
@@ -1040,6 +1044,10 @@ public class PhotoPaintView extends FrameLayout implements EntityView.EntityView
 
     }
 
+    protected void onTextAdd() {
+
+    }
+
     private Size baseStickerSize() {
         float side = (float) Math.floor(getPaintingSize().width * 0.5);
         return new Size(side, side);
@@ -1077,6 +1085,7 @@ public class PhotoPaintView extends FrameLayout implements EntityView.EntityView
     }
 
     private TextPaintView createText(boolean select) {
+        onTextAdd();
         Swatch currentSwatch = colorPicker.getSwatch();
         Swatch swatch;
         if (selectedTextType == 0) {

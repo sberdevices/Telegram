@@ -4,22 +4,25 @@ import android.Manifest;
 import android.annotation.TargetApi;
 import android.app.Activity;
 import android.content.Context;
-import android.content.DialogInterface;
 import android.content.Intent;
 import android.content.SharedPreferences;
 import android.content.pm.PackageManager;
+import android.graphics.Typeface;
 import android.net.Uri;
 import android.os.Build;
+import android.os.SystemClock;
 import android.provider.Settings;
-import android.text.InputType;
-import android.text.TextUtils;
+import android.util.Log;
 import android.util.TypedValue;
-import android.view.Gravity;
+import android.view.LayoutInflater;
 import android.view.View;
-import android.view.WindowManager;
+import android.view.ViewGroup;
+import android.widget.Button;
 import android.widget.LinearLayout;
 import android.widget.TextView;
-import android.widget.Toast;
+import android.widget.ToggleButton;
+
+import androidx.annotation.Nullable;
 
 import org.telegram.messenger.AccountInstance;
 import org.telegram.messenger.AndroidUtilities;
@@ -31,34 +34,42 @@ import org.telegram.messenger.FileLog;
 import org.telegram.messenger.LocaleController;
 import org.telegram.messenger.MessagesController;
 import org.telegram.messenger.R;
-import org.telegram.messenger.SendMessagesHelper;
 import org.telegram.messenger.UserConfig;
+import org.telegram.messenger.Utilities;
 import org.telegram.messenger.voip.Instance;
 import org.telegram.messenger.voip.VoIPService;
 import org.telegram.tgnet.ConnectionsManager;
 import org.telegram.tgnet.TLRPC;
 import org.telegram.ui.ActionBar.AlertDialog;
+import org.telegram.ui.ActionBar.BaseFragment;
 import org.telegram.ui.ActionBar.Theme;
-import org.telegram.ui.Cells.CheckBoxCell;
 import org.telegram.ui.Cells.TextCheckCell;
 import org.telegram.ui.Components.BetterRatingView;
-import org.telegram.ui.Components.EditTextBoldCursor;
 import org.telegram.ui.Components.LayoutHelper;
+import org.telegram.ui.GroupCallActivity;
 import org.telegram.ui.LaunchActivity;
 
 import java.io.File;
+import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Calendar;
 import java.util.Collections;
 import java.util.Locale;
 import java.util.Set;
+import java.util.concurrent.TimeUnit;
+
+import ru.sberdevices.sbdv.SbdvServiceLocator;
+import ru.sberdevices.sbdv.util.OnClickListenerWrapper;
 
 public class VoIPHelper {
+	private static final String TAG = "VoIPHelper";
 
 	public static long lastCallTime = 0;
 
 	private static final int VOIP_SUPPORT_ID = 4244000;
+	private static final String LAST_VOIP_LOG_PATH = "/data/user/0/ru.sberdevices.telegramcalls/cache/voip_logs/last.log";
+	private static final long THANKFUL_SCREEN_DISPLAYING_DURATION_MS = TimeUnit.SECONDS.toMillis(3);
 
 	public static void startCall(TLRPC.User user, boolean videoCall, boolean canVideoCall, final Activity activity, TLRPC.UserFull userFull) {
 		if (userFull != null && userFull.phone_calls_private) {
@@ -71,10 +82,69 @@ public class VoIPHelper {
 			return;
 		}
 		if (ConnectionsManager.getInstance(UserConfig.selectedAccount).getConnectionState() != ConnectionsManager.ConnectionStateConnected) {
-			boolean isAirplaneMode = Settings.System.getInt(activity.getContentResolver(), Settings.System.AIRPLANE_MODE_ON, 0) != 0;
+
+			// Изменен дизайн для алерта для старгейта
+			/*boolean isAirplaneMode = Settings.System.getInt(activity.getContentResolver(), Settings.System.AIRPLANE_MODE_ON, 0) != 0;
 			AlertDialog.Builder bldr = new AlertDialog.Builder(activity)
 					.setTitle(isAirplaneMode ? LocaleController.getString("VoipOfflineAirplaneTitle", R.string.VoipOfflineAirplaneTitle) : LocaleController.getString("VoipOfflineTitle", R.string.VoipOfflineTitle))
 					.setMessage(isAirplaneMode ? LocaleController.getString("VoipOfflineAirplane", R.string.VoipOfflineAirplane) : LocaleController.getString("VoipOffline", R.string.VoipOffline))
+					.setPositiveButton(LocaleController.getString("OK", R.string.OK), null);
+			if (isAirplaneMode) {
+				final Intent settingsIntent = new Intent(Settings.ACTION_AIRPLANE_MODE_SETTINGS);
+				if (settingsIntent.resolveActivity(activity.getPackageManager()) != null) {
+					bldr.setNeutralButton(LocaleController.getString("VoipOfflineOpenSettings", R.string.VoipOfflineOpenSettings), (dialog, which) -> activity.startActivity(settingsIntent));
+				}
+			}
+			try {
+				bldr.show();
+			} catch (Exception e) {
+				FileLog.e(e);
+			}*/
+
+			View dialogView = activity.getLayoutInflater().inflate(R.layout.sbdv_alert_dialog, null);
+			AlertDialog alertDialog = new AlertDialog.Builder(activity)
+					.setTransparentBackground(true)
+					.setView(dialogView)
+					.show();
+
+			TextView title = dialogView.findViewById(R.id.alertTitle);
+			TextView message = dialogView.findViewById(R.id.alertMessage);
+			TextView positiveButton = dialogView.findViewById(R.id.positiveButton);
+			title.setText(LocaleController.getString("VoipOfflineTitle", R.string.VoipOfflineTitle));
+			message.setText(LocaleController.getString("VoipOffline", R.string.VoipOffline));
+			positiveButton.setText(LocaleController.getString("OK", R.string.OK));
+			positiveButton.setOnClickListener((View v) -> alertDialog.dismiss());
+			return;
+		}
+
+		if (Build.VERSION.SDK_INT >= 23) {
+			int code;
+			ArrayList<String> permissions = new ArrayList<>();
+			if (activity.checkSelfPermission(Manifest.permission.RECORD_AUDIO) != PackageManager.PERMISSION_GRANTED) {
+				permissions.add(Manifest.permission.RECORD_AUDIO);
+			}
+			if (videoCall && activity.checkSelfPermission(Manifest.permission.CAMERA) != PackageManager.PERMISSION_GRANTED) {
+				permissions.add(Manifest.permission.CAMERA);
+			}
+			if (permissions.isEmpty()) {
+				initiateCall(user, null, videoCall, canVideoCall, false, activity);
+			} else {
+				activity.requestPermissions(permissions.toArray(new String[0]), videoCall ? 102 : 101);
+			}
+		} else {
+			initiateCall(user, null, videoCall, canVideoCall, false, activity);
+		}
+	}
+
+	public static void startCall(TLRPC.Chat chat, boolean createCall, final Activity activity) {
+		if (activity == null) {
+			return;
+		}
+		if (ConnectionsManager.getInstance(UserConfig.selectedAccount).getConnectionState() != ConnectionsManager.ConnectionStateConnected) {
+			boolean isAirplaneMode = Settings.System.getInt(activity.getContentResolver(), Settings.System.AIRPLANE_MODE_ON, 0) != 0;
+			AlertDialog.Builder bldr = new AlertDialog.Builder(activity)
+					.setTitle(isAirplaneMode ? LocaleController.getString("VoipOfflineAirplaneTitle", R.string.VoipOfflineAirplaneTitle) : LocaleController.getString("VoipOfflineTitle", R.string.VoipOfflineTitle))
+					.setMessage(isAirplaneMode ? LocaleController.getString("VoipGroupOfflineAirplane", R.string.VoipGroupOfflineAirplane) : LocaleController.getString("VoipGroupOffline", R.string.VoipGroupOffline))
 					.setPositiveButton(LocaleController.getString("OK", R.string.OK), null);
 			if (isAirplaneMode) {
 				final Intent settingsIntent = new Intent(Settings.ACTION_AIRPLANE_MODE_SETTINGS);
@@ -95,58 +165,121 @@ public class VoIPHelper {
 			if (activity.checkSelfPermission(Manifest.permission.RECORD_AUDIO) != PackageManager.PERMISSION_GRANTED) {
 				permissions.add(Manifest.permission.RECORD_AUDIO);
 			}
-			if (videoCall && activity.checkSelfPermission(Manifest.permission.CAMERA) != PackageManager.PERMISSION_GRANTED) {
-				permissions.add(Manifest.permission.CAMERA);
-			}
 			if (permissions.isEmpty()) {
-				initiateCall(user, videoCall, canVideoCall, activity);
+				initiateCall(null, chat, false, false, createCall, activity);
 			} else {
-				activity.requestPermissions(permissions.toArray(new String[0]), videoCall ? 102 : 101);
+				activity.requestPermissions(permissions.toArray(new String[0]), 103);
 			}
 		} else {
-			initiateCall(user, videoCall, canVideoCall, activity);
+			initiateCall(null, chat, false, false, createCall, activity);
 		}
 	}
 
-	private static void initiateCall(final TLRPC.User user, boolean videoCall, boolean canVideoCall, final Activity activity) {
-		if (activity == null || user == null) {
+	private static void initiateCall(TLRPC.User user, TLRPC.Chat chat, boolean videoCall, boolean canVideoCall, boolean createCall, final Activity activity) {
+		if (activity == null || user == null && chat == null) {
 			return;
 		}
+
 		if (VoIPService.getSharedInstance() != null) {
-			TLRPC.User callUser = VoIPService.getSharedInstance().getUser();
-			if (callUser.id != user.id) {
-				new AlertDialog.Builder(activity)
-						.setTitle(LocaleController.getString("VoipOngoingAlertTitle", R.string.VoipOngoingAlertTitle))
-						.setMessage(AndroidUtilities.replaceTags(LocaleController.formatString("VoipOngoingAlert", R.string.VoipOngoingAlert,
-								ContactsController.formatName(callUser.first_name, callUser.last_name),
-								ContactsController.formatName(user.first_name, user.last_name))))
-						.setPositiveButton(LocaleController.getString("OK", R.string.OK), (dialog, which) -> {
-							if (VoIPService.getSharedInstance() != null) {
-								VoIPService.getSharedInstance().hangUp(() -> doInitiateCall(user, videoCall, canVideoCall, activity));
-							} else {
-								doInitiateCall(user, videoCall, canVideoCall, activity);
-							}
-						})
-						.setNegativeButton(LocaleController.getString("Cancel", R.string.Cancel), null)
+			int newId = user != null ? user.id : -chat.id;
+			int callerId = VoIPService.getSharedInstance().getCallerId();
+			if (callerId != newId) {
+				String newName;
+				String oldName;
+				String key1;
+				int key2;
+				if (callerId > 0) {
+					TLRPC.User callUser = VoIPService.getSharedInstance().getUser();
+					oldName = ContactsController.formatName(callUser.first_name, callUser.last_name);
+					if (newId > 0) {
+						key1 = "VoipOngoingAlert";
+						key2 = R.string.VoipOngoingAlert;
+					} else {
+						key1 = "VoipOngoingAlert2";
+						key2 = R.string.VoipOngoingAlert2;
+					}
+				} else {
+					TLRPC.Chat callChat = VoIPService.getSharedInstance().getChat();
+					oldName = callChat.title;
+					if (newId > 0) {
+						key1 = "VoipOngoingChatAlert2";
+						key2 = R.string.VoipOngoingChatAlert2;
+					} else {
+						key1 = "VoipOngoingChatAlert";
+						key2 = R.string.VoipOngoingChatAlert;
+					}
+				}
+				if (user != null) {
+					newName = ContactsController.formatName(user.first_name, user.last_name);
+				} else {
+					newName = chat.title;
+				}
+
+				View dialogView = activity.getLayoutInflater().inflate(R.layout.sbdv_alert_dialog_canceled, null);
+				Typeface sbdvTypeFace = AndroidUtilities.getTypeface("fonts/SBSansText-Regular.ttf");
+				AlertDialog.Builder builder = new AlertDialog.Builder(activity);
+				builder.setTransparentBackground(true);
+				AlertDialog dialog = builder
+						.setView(dialogView)
 						.show();
+
+				TextView title = dialogView.findViewById(R.id.alertTitle);
+				title.setTypeface(sbdvTypeFace);
+				title.setText(callerId < 0 ? LocaleController.getString("VoipOngoingChatAlertTitle", R.string.VoipOngoingChatAlertTitle) : LocaleController.getString("VoipOngoingAlertTitle", R.string.VoipOngoingAlertTitle));
+
+				TextView message = dialogView.findViewById(R.id.alertMessage);
+				message.setTypeface(sbdvTypeFace);
+				message.setText(AndroidUtilities.replaceTags(LocaleController.formatString(key1, key2, oldName, newName)));
+
+				TextView positiveButton = dialogView.findViewById(R.id.positiveButton);
+				positiveButton.setTypeface(sbdvTypeFace);
+				positiveButton.setText(LocaleController.getString("OK", R.string.OK));
+				positiveButton.setOnClickListener((View v) -> {
+					if (VoIPService.getSharedInstance() != null) {
+						VoIPService.getSharedInstance().hangUp(() -> doInitiateCall(user, chat, videoCall, canVideoCall, createCall, activity));
+					} else {
+						doInitiateCall(user, chat, videoCall, canVideoCall, createCall, activity);
+					}
+					dialog.dismiss();
+				});
+
+				TextView cancelButton = dialogView.findViewById(R.id.cancelButton);
+				cancelButton.setTypeface(sbdvTypeFace);
+				cancelButton.setText(LocaleController.getString("Cancel", R.string.Cancel));
+				cancelButton.setOnClickListener((View v) -> {
+					dialog.dismiss();
+				});
+
 			} else {
-				activity.startActivity(new Intent(activity, LaunchActivity.class).setAction("voip"));
+				if (user != null || !(activity instanceof LaunchActivity)) {
+					activity.startActivity(new Intent(activity, LaunchActivity.class).setAction(user != null ? "voip" : "voip_chat"));
+				} else {
+					GroupCallActivity.create((LaunchActivity) activity, AccountInstance.getInstance(UserConfig.selectedAccount));
+				}
 			}
 		} else if (VoIPService.callIShouldHavePutIntoIntent == null) {
-			doInitiateCall(user, videoCall, canVideoCall, activity);
+			doInitiateCall(user, chat, videoCall, canVideoCall, createCall, activity);
 		}
 	}
 
-	private static void doInitiateCall(TLRPC.User user, boolean videoCall, boolean canVideoCall, Activity activity) {
-		if (activity == null || user == null) {
+	private static void doInitiateCall(TLRPC.User user, TLRPC.Chat chat, boolean videoCall, boolean canVideoCall, boolean createCall, Activity activity) {
+		Log.d(TAG, "doInitiateCall()");
+		if (activity == null || user == null && chat == null) {
+			Log.d(TAG, "can't initiate call: activity (" + activity + ") or user" + (user) + ") is NULL");
 			return;
 		}
-		if (System.currentTimeMillis() - lastCallTime < 2000) {
+		if (SystemClock.elapsedRealtime() - lastCallTime < (chat != null ? 200 : 2000)) {
+			Log.d(TAG, "can't initiate call: currentTime - lastCallTime < 2000");
 			return;
 		}
-		lastCallTime = System.currentTimeMillis();
+		lastCallTime = SystemClock.elapsedRealtime();
 		Intent intent = new Intent(activity, VoIPService.class);
-		intent.putExtra("user_id", user.id);
+		if (user != null) {
+			intent.putExtra("user_id", user.id);
+		} else {
+			intent.putExtra("chat_id", chat.id);
+			intent.putExtra("createGroupCall", createCall);
+		}
 		intent.putExtra("is_outgoing", true);
 		intent.putExtra("start_incall_activity", true);
 		intent.putExtra("video_call", Build.VERSION.SDK_INT >= 18 && videoCall);
@@ -205,17 +338,18 @@ public class VoIPHelper {
 		return false;
 	}
 
-	public static void showRateAlert(Context context, TLRPC.TL_messageActionPhoneCall call) {
+	public static void showRateAlert(ViewGroup viewGroup, TLRPC.TL_messageActionPhoneCall call) {
 		SharedPreferences prefs = MessagesController.getNotificationsSettings(UserConfig.selectedAccount); // always called from chat UI
 		Set<String> hashes = prefs.getStringSet("calls_access_hashes", (Set<String>) Collections.EMPTY_SET);
 		for (String hash : hashes) {
 			String[] d = hash.split(" ");
-			if (d.length < 2)
+			if (d.length < 2) {
 				continue;
+			}
 			if (d[0].equals(call.call_id + "")) {
 				try {
 					long accessHash = Long.parseLong(d[1]);
-					showRateAlert(context, null, call.video, call.call_id, accessHash, UserConfig.selectedAccount, true);
+					showRateAlert(viewGroup, null, call.video, call.call_id, accessHash, UserConfig.selectedAccount, true);
 				} catch (Exception ignore) {
 				}
 				return;
@@ -223,200 +357,89 @@ public class VoIPHelper {
 		}
 	}
 
-	public static void showRateAlert(final Context context, final Runnable onDismiss, boolean isVideo, final long callID, final long accessHash, final int account, final boolean userInitiative) {
-		final File log = getLogFile(callID);
-		final int[] page = {0};
-		LinearLayout alertView = new LinearLayout(context);
-		alertView.setOrientation(LinearLayout.VERTICAL);
-
-		int pad = AndroidUtilities.dp(16);
-		alertView.setPadding(pad, pad, pad, 0);
-
-		TextView text = new TextView(context);
-		text.setTextSize(TypedValue.COMPLEX_UNIT_SP, 16);
-		text.setTextColor(Theme.getColor(Theme.key_dialogTextBlack));
-		text.setGravity(Gravity.CENTER);
-		text.setText(LocaleController.getString("VoipRateCallAlert", R.string.VoipRateCallAlert));
-		alertView.addView(text);
-
-		final BetterRatingView bar = new BetterRatingView(context);
-		alertView.addView(bar, LayoutHelper.createLinear(LayoutHelper.WRAP_CONTENT, LayoutHelper.WRAP_CONTENT, Gravity.CENTER_HORIZONTAL, 0, 16, 0, 0));
-
-		final LinearLayout problemsWrap = new LinearLayout(context);
-		problemsWrap.setOrientation(LinearLayout.VERTICAL);
-
-		View.OnClickListener problemCheckboxClickListener = v -> {
-			CheckBoxCell check = (CheckBoxCell) v;
-			check.setChecked(!check.isChecked(), true);
-		};
-
-		final String[] problems = {isVideo ? "distorted_video" : null, isVideo ? "pixelated_video" : null, "echo", "noise", "interruptions", "distorted_speech", "silent_local", "silent_remote", "dropped"};
-		for (int i = 0; i < problems.length; i++) {
-			if (problems[i] == null) {
-				continue;
+	public static void showRateAlert(final ViewGroup viewGroup, @Nullable final Runnable onDismiss, boolean isVideo, final long callID, final long accessHash, final int account, final boolean userInitiative) {
+		final Context context = viewGroup.getContext();
+		final View ratingLayout = LayoutInflater.from(context).inflate(R.layout.sbdv_rate_call_layout, viewGroup);
+		final Button skipButton = ratingLayout.findViewById(R.id.rate_skip_button);
+		final BetterRatingView ratingView = ratingLayout.findViewById(R.id.call_rating_view);
+		skipButton.setOnClickListener(OnClickListenerWrapper.throttleFirst((View) -> {
+			if (onDismiss != null) {
+				onDismiss.run();
 			}
-			CheckBoxCell check = new CheckBoxCell(context, 1);
-			check.setClipToPadding(false);
-			check.setTag(problems[i]);
-			String label = null;
-			switch (i) {
-				case 0:
-					label = LocaleController.getString("RateCallVideoDistorted", R.string.RateCallVideoDistorted);
-					break;
-				case 1:
-					label = LocaleController.getString("RateCallVideoPixelated", R.string.RateCallVideoPixelated);
-					break;
-				case 2:
-					label = LocaleController.getString("RateCallEcho", R.string.RateCallEcho);
-					break;
-				case 3:
-					label = LocaleController.getString("RateCallNoise", R.string.RateCallNoise);
-					break;
-				case 4:
-					label = LocaleController.getString("RateCallInterruptions", R.string.RateCallInterruptions);
-					break;
-				case 5:
-					label = LocaleController.getString("RateCallDistorted", R.string.RateCallDistorted);
-					break;
-				case 6:
-					label = LocaleController.getString("RateCallSilentLocal", R.string.RateCallSilentLocal);
-					break;
-				case 7:
-					label = LocaleController.getString("RateCallSilentRemote", R.string.RateCallSilentRemote);
-					break;
-				case 8:
-					label = LocaleController.getString("RateCallDropped", R.string.RateCallDropped);
-					break;
-			}
-			check.setText(label, null, false, false);
-			check.setOnClickListener(problemCheckboxClickListener);
-			check.setTag(problems[i]);
-			problemsWrap.addView(check);
-		}
-		alertView.addView(problemsWrap, LayoutHelper.createLinear(LayoutHelper.MATCH_PARENT, LayoutHelper.WRAP_CONTENT, -8, 0, -8, 0));
-		problemsWrap.setVisibility(View.GONE);
-
-		final EditTextBoldCursor commentBox = new EditTextBoldCursor(context);
-		commentBox.setHint(LocaleController.getString("VoipFeedbackCommentHint", R.string.VoipFeedbackCommentHint));
-		commentBox.setInputType(InputType.TYPE_CLASS_TEXT | InputType.TYPE_TEXT_FLAG_CAP_SENTENCES | InputType.TYPE_TEXT_FLAG_MULTI_LINE);
-		commentBox.setTextColor(Theme.getColor(Theme.key_dialogTextBlack));
-		commentBox.setHintTextColor(Theme.getColor(Theme.key_dialogTextHint));
-		commentBox.setBackgroundDrawable(Theme.createEditTextDrawable(context, true));
-		commentBox.setPadding(0, AndroidUtilities.dp(4), 0, AndroidUtilities.dp(4));
-		commentBox.setTextSize(18);
-		commentBox.setVisibility(View.GONE);
-		alertView.addView(commentBox, LayoutHelper.createLinear(LayoutHelper.MATCH_PARENT, LayoutHelper.WRAP_CONTENT, 8, 8, 8, 0));
-
-		final boolean[] includeLogs = {true};
-		final CheckBoxCell checkbox = new CheckBoxCell(context, 1);
-		View.OnClickListener checkClickListener = v -> {
-			includeLogs[0] = !includeLogs[0];
-			checkbox.setChecked(includeLogs[0], true);
-		};
-		checkbox.setText(LocaleController.getString("CallReportIncludeLogs", R.string.CallReportIncludeLogs), null, true, false);
-		checkbox.setClipToPadding(false);
-		checkbox.setOnClickListener(checkClickListener);
-		alertView.addView(checkbox, LayoutHelper.createLinear(LayoutHelper.MATCH_PARENT, LayoutHelper.WRAP_CONTENT, -8, 0, -8, 0));
-
-		final TextView logsText = new TextView(context);
-		logsText.setTextSize(TypedValue.COMPLEX_UNIT_SP, 14);
-		logsText.setTextColor(Theme.getColor(Theme.key_dialogTextGray3));
-		logsText.setText(LocaleController.getString("CallReportLogsExplain", R.string.CallReportLogsExplain));
-		logsText.setPadding(AndroidUtilities.dp(8), 0, AndroidUtilities.dp(8), 0);
-		logsText.setOnClickListener(checkClickListener);
-		alertView.addView(logsText);
-
-		checkbox.setVisibility(View.GONE);
-		logsText.setVisibility(View.GONE);
-		if (!log.exists()) {
-			includeLogs[0] = false;
-		}
-
-		final AlertDialog alert = new AlertDialog.Builder(context)
-				.setTitle(LocaleController.getString("CallMessageReportProblem", R.string.CallMessageReportProblem))
-				.setView(alertView)
-				.setPositiveButton(LocaleController.getString("Send", R.string.Send), (dialog, which) -> {
-					//SendMessagesHelper.getInstance(currentAccount).sendMessage(commentBox.getText().toString(), VOIP_SUPPORT_ID, null, null, true, null, null, null);
-				})
-				.setNegativeButton(LocaleController.getString("Cancel", R.string.Cancel), null)
-				.setOnDismissListener(dialog -> {
-					if (onDismiss != null)
-						onDismiss.run();
-				})
-				.create();
-		if (BuildVars.LOGS_ENABLED && log.exists()) {
-			alert.setNeutralButton("Send log", (dialog, which) -> {
-				Intent intent = new Intent(context, LaunchActivity.class);
-				intent.setAction(Intent.ACTION_SEND);
-				intent.putExtra(Intent.EXTRA_STREAM, Uri.fromFile(log));
-				context.startActivity(intent);
-			});
-		}
-		alert.show();
-		alert.getWindow().setSoftInputMode(WindowManager.LayoutParams.SOFT_INPUT_STATE_ALWAYS_HIDDEN);
-
-		final View btn = alert.getButton(DialogInterface.BUTTON_POSITIVE);
-		btn.setEnabled(false);
-		bar.setOnRatingChangeListener(rating -> {
-			btn.setEnabled(rating > 0);
-			/*commentBox.setHint(rating<4 ? LocaleController.getString("CallReportHint", R.string.CallReportHint) : LocaleController.getString("VoipFeedbackCommentHint", R.string.VoipFeedbackCommentHint));
-			commentBox.setVisibility(rating < 5 && rating > 0 ? View.VISIBLE : View.GONE);
-			if (commentBox.getVisibility() == View.GONE) {
-				((InputMethodManager) context.getSystemService(Context.INPUT_METHOD_SERVICE)).hideSoftInputFromWindow(commentBox.getWindowToken(), 0);
-			}
-			*/
-			((TextView) btn).setText((rating < 4 ? LocaleController.getString("Next", R.string.Next) : LocaleController.getString("Send", R.string.Send)).toUpperCase());
-		});
-		btn.setOnClickListener(v -> {
-			int rating = bar.getRating();
-			if (rating >= 4 || page[0] == 1) {
-				final int currentAccount = UserConfig.selectedAccount;
-				final TLRPC.TL_phone_setCallRating req = new TLRPC.TL_phone_setCallRating();
-				req.rating = bar.getRating();
-				ArrayList<String> problemTags = new ArrayList<>();
-				for (int i = 0; i < problemsWrap.getChildCount(); i++) {
-					CheckBoxCell check = (CheckBoxCell) problemsWrap.getChildAt(i);
-					if (check.isChecked())
-						problemTags.add("#" + check.getTag());
-				}
-
-				if (req.rating < 5) {
-					req.comment = commentBox.getText().toString();
-				} else {
-					req.comment = "";
-				}
-				if (!problemTags.isEmpty() && !includeLogs[0]) {
-					req.comment += " " + TextUtils.join(" ", problemTags);
-				}
-				req.peer = new TLRPC.TL_inputPhoneCall();
-				req.peer.access_hash = accessHash;
-				req.peer.id = callID;
-				req.user_initiative = userInitiative;
-				ConnectionsManager.getInstance(account).sendRequest(req, (response, error) -> {
-					if (response instanceof TLRPC.TL_updates) {
-						TLRPC.TL_updates updates = (TLRPC.TL_updates) response;
-						MessagesController.getInstance(currentAccount).processUpdates(updates, false);
-					}
-					if (includeLogs[0] && log.exists() && req.rating < 4) {
-						AccountInstance accountInstance = AccountInstance.getInstance(UserConfig.selectedAccount);
-						SendMessagesHelper.prepareSendingDocument(accountInstance, log.getAbsolutePath(), log.getAbsolutePath(), null, TextUtils.join(" ", problemTags), "text/plain", VOIP_SUPPORT_ID, null, null, null, true, 0);
-						Toast.makeText(context, LocaleController.getString("CallReportSent", R.string.CallReportSent), Toast.LENGTH_LONG).show();
-					}
-				});
-				alert.dismiss();
+		}));
+		ratingView.setOnRatingChangeListener(rating -> {
+			if (rating < 5) {
+				skipButton.setText(R.string.sbdv_further);
+				skipButton.setOnClickListener(OnClickListenerWrapper.throttleFirst((View) -> {
+					showRateProblemsLayout(ratingLayout, callID, onDismiss, viewGroup);
+				}));
 			} else {
-				page[0] = 1;
-				bar.setVisibility(View.GONE);
-				//text.setText(LocaleController.getString("CallReportHint", R.string.CallReportHint));
-				text.setVisibility(View.GONE);
-				alert.setTitle(LocaleController.getString("CallReportHint", R.string.CallReportHint));
-				commentBox.setVisibility(View.VISIBLE);
-				if (log.exists()) {
-					checkbox.setVisibility(View.VISIBLE);
-					logsText.setVisibility(View.VISIBLE);
+				skipButton.setText(R.string.sbdv_send);
+				skipButton.setOnClickListener(OnClickListenerWrapper.throttleFirst((View) -> {
+					SbdvServiceLocator.getVoIPModelSharedInstance().onCallRate(Long.toString(callID), rating);
+					sendBugReportAsync(callID, null);
+					showThankfulScreen(onDismiss, viewGroup);
+				}));
+			}
+		});
+	}
+
+	private static void showRateProblemsLayout(View ratingLayout, long callId, Runnable onDismiss, ViewGroup root) {
+		final TextView titleTextView = ratingLayout.findViewById(R.id.title_tv);
+		final TextView descriptionTextView = ratingLayout.findViewById(R.id.description_tv);
+		final LinearLayout problemsLayout = ratingLayout.findViewById(R.id.problems_layout);
+		final BetterRatingView ratingView = ratingLayout.findViewById(R.id.call_rating_view);
+		final Button skipButton = ratingLayout.findViewById(R.id.rate_skip_button);
+
+		final ToggleButton badSoundButton = problemsLayout.findViewById(R.id.bad_sound_toggle);
+		final ToggleButton badImageButton = problemsLayout.findViewById(R.id.bad_image_toggle);
+		final Button otherProblemButton = problemsLayout.findViewById(R.id.other_problem_button);
+
+		titleTextView.setText(R.string.sbdv_what_didnt_like);
+		descriptionTextView.setText(R.string.sbdv_what_didnt_like);
+		problemsLayout.setVisibility(View.VISIBLE);
+		ratingView.setVisibility(View.GONE);
+
+		skipButton.setText(R.string.sbdv_send);
+		skipButton.setOnClickListener(OnClickListenerWrapper.throttleFirst((view) -> {
+			String description = "";
+			if (badImageButton.isChecked()) {
+				description += view.getContext().getResources().getString(R.string.sbdv_bad_image);
+			}
+			if (badSoundButton.isChecked()) {
+				if (!description.isEmpty()) {
+					description += ", ";
 				}
-				problemsWrap.setVisibility(View.VISIBLE);
-				((TextView) btn).setText(LocaleController.getString("Send", R.string.Send).toUpperCase());
+				description += view.getContext().getResources().getString(R.string.sbdv_bad_sound);
+			}
+			sendBugReportAsync(callId, description);
+			showThankfulScreen(onDismiss, root);
+		}));
+
+		//TODO
+		otherProblemButton.setVisibility(View.GONE);
+		otherProblemButton.setOnClickListener((view) -> {
+		});
+	}
+
+	private static void showThankfulScreen(Runnable onDismiss, ViewGroup root) {
+		View screen = LayoutInflater.from(root.getContext()).inflate(R.layout.sbdv_rate_thankful_screen, root);
+		screen.setOnClickListener(OnClickListenerWrapper.throttleFirst((View) -> {
+			onDismiss.run();
+		}));
+		screen.postDelayed(onDismiss, THANKFUL_SCREEN_DISPLAYING_DURATION_MS);
+	}
+
+	private static void sendBugReportAsync(long callID, String description) {
+		boolean descriptionIsEmpty = description == null || description.isEmpty();
+		String message = "Call feedback. CallId: " + callID + (descriptionIsEmpty ? "" : "; Description: " + description);
+		Utilities.globalQueue.postRunnable(() -> {
+			try {
+				Log.d(TAG, "Sending bugReport. CallId: " + callID);
+				AndroidUtilities.copyFile(getLogFile(callID), new File(LAST_VOIP_LOG_PATH));
+				SbdvServiceLocator.getSettingsSharedInstance().sendBugReport(message);
+			} catch (IOException exception) {
+				Log.w(TAG, "Unable to send voip bugReport.", exception);
 			}
 		});
 	}
@@ -517,7 +540,7 @@ public class VoIPHelper {
 				c.get(Calendar.MINUTE), c.get(Calendar.SECOND), name)).getAbsolutePath();
 	}
 
-	public static String getLogFilePath(long callId) {
+	public static String getLogFilePath(long callId, boolean stats) {
 		final File logsDir = getLogsDir();
 		if (!BuildVars.DEBUG_VERSION) {
 			final File[] _logs = logsDir.listFiles();
@@ -537,4 +560,27 @@ public class VoIPHelper {
 		}
 		return new File(logsDir, callId + ".log").getAbsolutePath();
 	}
+
+    public static void showGroupCallAlert(BaseFragment fragment, TLRPC.Chat currentChat, boolean recreate) {
+		if (fragment == null || fragment.getParentActivity() == null) {
+			return;
+		}
+		AlertDialog.Builder builder = new AlertDialog.Builder(fragment.getParentActivity());
+
+		builder.setTitle(LocaleController.getString("StartVoipChatTitle", R.string.StartVoipChatTitle));
+		if (recreate) {
+			builder.setMessage(LocaleController.getString("VoipGroupEndedStartNew", R.string.VoipGroupEndedStartNew));
+		} else {
+			builder.setMessage(LocaleController.getString("StartVoipChatAlertText", R.string.StartVoipChatAlertText));
+		}
+
+		builder.setPositiveButton(LocaleController.getString("Start", R.string.Start), (dialogInterface, i) -> {
+			if (fragment.getParentActivity() == null) {
+				return;
+			}
+			VoIPHelper.startCall(currentChat, true, fragment.getParentActivity());
+		});
+		builder.setNegativeButton(LocaleController.getString("Cancel", R.string.Cancel), null);
+		fragment.showDialog(builder.create());
+    }
 }

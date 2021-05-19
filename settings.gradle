@@ -1,1 +1,6 @@
+/**
+ * settings.gradle, used for stanalone telegram calls build
+ *
+ * @author Ilya Bogdanovich on 27.01.2021
+ */
 include ':TMessagesProj'

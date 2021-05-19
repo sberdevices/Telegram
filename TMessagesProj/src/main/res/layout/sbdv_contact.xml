@@ -1,0 +1,67 @@
+<?xml version="1.0" encoding="utf-8"?>
+<androidx.constraintlayout.widget.ConstraintLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    xmlns:tools="http://schemas.android.com/tools"
+    android:layout_width="@dimen/card_width"
+    android:layout_height="@dimen/card_contact_height"
+    android:layout_marginEnd="@dimen/card_margin"
+    android:background="@drawable/card_background"
+    android:foreground="@drawable/sbdv_selector_focusable_card">
+
+    <!-- Число на фоне в правом верхнем углу -->
+    <TextView
+        android:id="@+id/text_number"
+        android:layout_width="64dp"
+        android:layout_height="64dp"
+        android:layout_marginTop="12dp"
+        android:layout_marginEnd="12dp"
+        android:background="@drawable/circle_gray"
+        android:gravity="center"
+        android:textAlignment="gravity"
+        android:textAppearance="@style/TextAppearance.Sbdv.Body1.Bold"
+        android:textColor="@color/sbdv_white_56"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintTop_toTopOf="parent"
+        tools:text="7" />
+
+    <!-- лого в верхнем левом углу -->
+    <ImageView
+        android:id="@+id/image_call_provider"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginStart="24dp"
+        android:layout_marginTop="30dp"
+        android:importantForAccessibility="no"
+        android:src="@drawable/ic_tg_plane"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintTop_toTopOf="parent" />
+
+    <!-- аватар с индикатором -->
+    <ru.sberdevices.sbdv.view.AvatarView
+        android:id="@+id/avatar"
+        android:layout_width="176dp"
+        android:layout_height="176dp"
+        android:layout_marginTop="64dp"
+        app:cardCornerRadius="88dp"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintTop_toTopOf="parent" />
+
+    <TextView
+        android:id="@+id/text_full_name"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_gravity="center_horizontal"
+        android:layout_marginTop="24dp"
+        android:ellipsize="end"
+        android:gravity="center_horizontal"
+        android:lines="2"
+        android:textAppearance="@style/TextAppearance.Sbdv.Title"
+        android:textColor="@color/sbdv_white"
+        app:layout_constrainedWidth="true"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintTop_toBottomOf="@id/avatar"
+        tools:text="Запасан Крупогречовско-Рисовый" />
+
+</androidx.constraintlayout.widget.ConstraintLayout>

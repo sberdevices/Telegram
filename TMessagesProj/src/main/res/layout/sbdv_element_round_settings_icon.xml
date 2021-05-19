@@ -1,0 +1,28 @@
+<?xml version="1.0" encoding="utf-8"?>
+<FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:id="@+id/settings_container"
+    android:layout_width="80dp"
+    android:layout_height="80dp"
+    android:foreground="@drawable/sbdv_selector_focusable_button">
+
+    <androidx.cardview.widget.CardView
+        android:layout_width="80dp"
+        android:layout_height="80dp"
+        android:layout_gravity="center"
+        android:duplicateParentState="true"
+        app:cardBackgroundColor="@color/sbdv_white_05"
+        app:cardCornerRadius="@dimen/sbdv_status_bar_button_radius"
+        app:cardElevation="0dp">
+
+        <ImageView
+            android:id="@+id/settings_image"
+            android:layout_width="36dp"
+            android:layout_height="36dp"
+            android:layout_gravity="center"
+            android:importantForAccessibility="no"
+            android:scaleType="fitXY"
+            android:src="@drawable/ic_settings" />
+    </androidx.cardview.widget.CardView>
+
+</FrameLayout>

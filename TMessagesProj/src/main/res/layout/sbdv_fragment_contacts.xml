@@ -1,0 +1,43 @@
+<androidx.constraintlayout.widget.ConstraintLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    xmlns:tools="http://schemas.android.com/tools"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:animateLayoutChanges="false"
+    android:orientation="vertical">
+
+    <androidx.recyclerview.widget.RecyclerView
+        android:id="@+id/contactsRecyclerView"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_gravity="center_vertical"
+        android:clipToPadding="false"
+        android:orientation="horizontal"
+        android:paddingStart="112dp"
+        android:paddingBottom="96dp"
+        android:scrollbars="none"
+        app:layout_constraintTop_toTopOf="parent"
+        tools:itemCount="1"
+        tools:listitem="@layout/sbdv_contact" />
+
+    <ru.sberdevices.sbdv.view.alphabeticrecyclerview.AlphabeticRecyclerView
+        android:id="@+id/alphabeticRecyclerView"
+        android:layout_width="640dp"
+        android:layout_height="48dp"
+        android:layout_margin="24dp"
+        android:orientation="horizontal"
+        app:fontSize="32sp"
+        app:itemHorizontalPadding="32dp"
+        app:itemsColor="@color/white"
+        app:layout_constraintBottom_toBottomOf="parent"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintStart_toStartOf="parent"
+        tools:itemCount="7"
+        tools:listitem="@layout/alphabetic_item" />
+
+    <include
+        android:id="@+id/emptyContactsLayout"
+        layout="@layout/sbdv_empty_contacts_layout"
+        android:visibility="gone" />
+
+</androidx.constraintlayout.widget.ConstraintLayout>

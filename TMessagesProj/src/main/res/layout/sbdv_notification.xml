@@ -1,0 +1,111 @@
+<?xml version="1.0" encoding="utf-8"?>
+<FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content">
+
+    <androidx.cardview.widget.CardView
+        android:layout_width="match_parent"
+        android:layout_height="160dp"
+        android:layout_marginStart="72dp"
+        android:layout_marginTop="32dp"
+        android:layout_marginEnd="72dp"
+        app:cardBackgroundColor="#1A1A1A"
+        app:cardCornerRadius="32dp"
+        app:cardElevation="18dp">
+
+        <androidx.constraintlayout.widget.ConstraintLayout
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:orientation="horizontal">
+
+            <ru.sberdevices.sbdv.view.AvatarView
+                android:id="@+id/photoView"
+                android:layout_width="88dp"
+                android:layout_height="88dp"
+                android:layout_marginStart="40dp"
+                app:cardCornerRadius="44dp"
+                app:layout_constraintBottom_toBottomOf="parent"
+                app:layout_constraintStart_toStartOf="parent"
+                app:layout_constraintTop_toTopOf="parent" />
+
+            <LinearLayout
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginStart="24dp"
+                android:orientation="vertical"
+                app:layout_constraintBottom_toBottomOf="parent"
+                app:layout_constraintStart_toEndOf="@id/photoView"
+                app:layout_constraintTop_toTopOf="parent">
+
+                <TextView
+                    android:id="@+id/nameView"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:textColor="#fff"
+                    android:textSize="28sp" />
+
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:alpha="0.5"
+                    android:text="@string/sbdv_incoming_call"
+                    android:textColor="#fff"
+                    android:textSize="28sp" />
+            </LinearLayout>
+
+            <Button
+                android:id="@+id/vcAccept"
+                android:layout_width="wrap_content"
+                android:layout_height="80dp"
+                android:layout_marginEnd="32dp"
+                android:background="@drawable/sbdv_accept_call_background"
+                android:foreground="@drawable/sbdv_selector_focusable_button_24"
+                android:gravity="center"
+                android:minWidth="260dp"
+                android:text="@string/sbdv_accept"
+                android:textAllCaps="false"
+                android:textColor="#fff"
+                android:textSize="28sp"
+                app:layout_constraintBottom_toBottomOf="parent"
+                app:layout_constraintEnd_toStartOf="@id/vcDecline"
+                app:layout_constraintTop_toTopOf="parent" />
+
+            <Button
+                android:id="@+id/vcDecline"
+                android:layout_width="wrap_content"
+                android:layout_height="80dp"
+                android:layout_marginEnd="40dp"
+                android:background="@drawable/sbdv_decline_call_background"
+                android:foreground="@drawable/sbdv_selector_focusable_button_24"
+                android:gravity="center"
+                android:minWidth="260dp"
+                android:text="@string/sbdv_decline"
+                android:textAllCaps="false"
+                android:textColor="#fff"
+                android:textSize="28sp"
+                app:layout_constraintBottom_toBottomOf="parent"
+                app:layout_constraintEnd_toEndOf="parent"
+                app:layout_constraintTop_toTopOf="parent" />
+
+            <Button
+                android:id="@+id/vcEndCall"
+                android:layout_width="wrap_content"
+                android:layout_height="80dp"
+                android:layout_marginEnd="40dp"
+                android:background="@drawable/sbdv_decline_call_background"
+                android:foreground="@drawable/sbdv_selector_focusable_button_24"
+                android:gravity="center"
+                android:minWidth="260dp"
+                android:text="@string/sbdv_end_call"
+                android:textAllCaps="false"
+                android:textColor="#fff"
+                android:textSize="28sp"
+                app:layout_constraintBottom_toBottomOf="parent"
+                app:layout_constraintStart_toEndOf="@+id/vcAccept"
+                app:layout_constraintTop_toTopOf="parent" />
+
+        </androidx.constraintlayout.widget.ConstraintLayout>
+    </androidx.cardview.widget.CardView>
+
+</FrameLayout>

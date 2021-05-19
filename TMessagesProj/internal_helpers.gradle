@@ -1,0 +1,27 @@
+/**
+ * Helpers to build telegram-calls inside our internal projects tree
+ *
+ * @author Ilya Bogdanovich on 27.01.2021
+ */
+Boolean isInternalProjectBuild() {
+    // we make sure we are working in internal project tree by finding a very specific internal project.
+    rootProject.findProject(':assistant:assistant-app') != null
+}
+
+def internal(Closure deps) {
+    if (isInternalProjectBuild()) {
+        deps.call()
+    }
+}
+
+def external(Closure deps) {
+    if (!isInternalProjectBuild()) {
+        deps.call()
+    }
+}
+
+ext {
+    isInternalProjectBuild = this.&isInternalProjectBuild
+    internal = this.&internal
+    external = this.&external
+}

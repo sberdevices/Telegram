@@ -1,0 +1,21 @@
+<FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:animateLayoutChanges="true">
+
+    <androidx.recyclerview.widget.RecyclerView
+        android:id="@+id/recentCallsRecyclerView"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_gravity="center_vertical"
+        android:clipToPadding="false"
+        android:orientation="horizontal"
+        android:paddingStart="112dp"
+        android:scrollbars="none" />
+
+    <include
+        android:id="@+id/emptyContactsCallsLayout"
+        layout="@layout/sbdv_empty_contacts_layout"
+        android:visibility="gone" />
+
+</FrameLayout>

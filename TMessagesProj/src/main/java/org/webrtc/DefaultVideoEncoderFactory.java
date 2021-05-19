@@ -11,6 +11,9 @@
 package org.webrtc;
 
 import androidx.annotation.Nullable;
+import androidx.lifecycle.LiveData;
+import androidx.lifecycle.MutableLiveData;
+
 import java.util.Arrays;
 import java.util.LinkedHashSet;
 
@@ -18,6 +21,9 @@ import java.util.LinkedHashSet;
 public class DefaultVideoEncoderFactory implements VideoEncoderFactory {
   private final VideoEncoderFactory hardwareVideoEncoderFactory;
   private final VideoEncoderFactory softwareVideoEncoderFactory = new SoftwareVideoEncoderFactory();
+
+  private static MutableLiveData<VideoCodecInfo> _chosenCodec = new MutableLiveData<>();
+  public static LiveData<VideoCodecInfo> chosenEncoderCodec = _chosenCodec;
 
   /** Create encoder factory using default hardware encoder factory. */
   public DefaultVideoEncoderFactory(
@@ -36,6 +42,7 @@ public class DefaultVideoEncoderFactory implements VideoEncoderFactory {
   public VideoEncoder createEncoder(VideoCodecInfo info) {
     final VideoEncoder softwareEncoder = softwareVideoEncoderFactory.createEncoder(info);
     final VideoEncoder hardwareEncoder = hardwareVideoEncoderFactory.createEncoder(info);
+    _chosenCodec.postValue(info);
     if (hardwareEncoder != null && softwareEncoder != null) {
       // Both hardware and software supported, wrap it in a software fallback
       return new VideoEncoderFallback(

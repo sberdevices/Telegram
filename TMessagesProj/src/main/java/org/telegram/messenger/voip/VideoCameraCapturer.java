@@ -5,7 +5,7 @@ import android.os.Build;
 import android.os.Handler;
 import android.os.HandlerThread;
 
-import com.google.android.datatransport.runtime.logging.Logging;
+import androidx.annotation.Nullable;
 
 import org.telegram.messenger.AndroidUtilities;
 import org.telegram.messenger.ApplicationLoader;
@@ -16,13 +16,16 @@ import org.webrtc.CameraEnumerator;
 import org.webrtc.CameraVideoCapturer;
 import org.webrtc.CapturerObserver;
 import org.webrtc.EglBase;
+import org.webrtc.Logging;
 import org.webrtc.SurfaceTextureHelper;
+import org.webrtc.VideoFrame;
+import org.webrtc.VideoProcessor;
 
 @TargetApi(18)
 public class VideoCameraCapturer {
 
-    private static final int CAPTURE_WIDTH = Build.VERSION.SDK_INT <= 19 ? 480 : 1280;
-    private static final int CAPTURE_HEIGHT = Build.VERSION.SDK_INT <= 19 ? 320 : 720;
+    static final int CAPTURE_WIDTH = 1920;
+    static final int CAPTURE_HEIGHT = 1080;
     private static final int CAPTURE_FPS = 30;
 
     public static EglBase eglBase;
@@ -46,7 +49,8 @@ public class VideoCameraCapturer {
         if (Build.VERSION.SDK_INT < 18) {
             return;
         }
-        Logging.i("VideoCameraCapturer", "device model = " + Build.MANUFACTURER + Build.MODEL);
+        Logging.enableLogToDebugOutput(Logging.Severity.LS_INFO);
+        Logging.d("VideoCameraCapturer", "device model = " + Build.MANUFACTURER + Build.MODEL);
         AndroidUtilities.runOnUIThread(() -> {
             instance = this;
             thread = new HandlerThread("CallThread");
@@ -73,7 +77,7 @@ public class VideoCameraCapturer {
             String[] names = enumerator.getDeviceNames();
             for (int a = 0; a < names.length; a++) {
                 boolean isFrontFace = enumerator.isFrontFacing(names[a]);
-                if (isFrontFace == useFrontCamera) {
+                if (isFrontFace) {
                     index = a;
                     break;
                 }
@@ -87,7 +91,8 @@ public class VideoCameraCapturer {
                 videoCapturerSurfaceTextureHelper = SurfaceTextureHelper.create("VideoCapturerThread", eglBase.getEglBaseContext());
                 handler.post(() -> {
                     nativeCapturerObserver = nativeGetJavaVideoCapturerObserver(nativePtr);
-                    videoCapturer.initialize(videoCapturerSurfaceTextureHelper, ApplicationLoader.applicationContext, nativeCapturerObserver);
+                    VideoCropper cropper = new VideoCropper(nativeCapturerObserver);
+                    videoCapturer.initialize(videoCapturerSurfaceTextureHelper, ApplicationLoader.applicationContext, cropper);
                     videoCapturer.startCapture(CAPTURE_WIDTH, CAPTURE_HEIGHT, CAPTURE_FPS);
                 });
             } else {

@@ -12,6 +12,7 @@ import android.graphics.drawable.ColorDrawable;
 import android.graphics.drawable.Drawable;
 import android.os.Bundle;
 import android.util.SparseIntArray;
+import android.util.TypedValue;
 import android.view.Gravity;
 import android.view.View;
 import android.view.ViewGroup;
@@ -71,6 +72,7 @@ import org.telegram.ui.Charts.data.StackLinearChartData;
 import org.telegram.ui.Charts.view_data.ChartHeaderView;
 import org.telegram.ui.Charts.view_data.LineViewData;
 import org.telegram.ui.Charts.view_data.TransitionParams;
+import org.telegram.ui.Components.BulletinFactory;
 import org.telegram.ui.Components.ChatAvatarContainer;
 import org.telegram.ui.Components.CombinedDrawable;
 import org.telegram.ui.Components.FlatCheckBox;
@@ -139,7 +141,7 @@ public class StatisticActivity extends BaseFragment implements NotificationCente
     public StatisticActivity(Bundle args) {
         super(args);
         int chatId = args.getInt("chat_id");
-        isMegagroup = args.getBoolean("is_megagroup");
+        isMegagroup = args.getBoolean("is_megagroup", false);
         this.chat = getMessagesController().getChatFull(chatId);
     }
 
@@ -190,6 +192,10 @@ public class StatisticActivity extends BaseFragment implements NotificationCente
                 chartsViewData[7] = createViewData(stats.languages_graph, LocaleController.getString("LanguagesChartTitle", R.string.LanguagesChartTitle), 4, true);
                 chartsViewData[8] = createViewData(stats.mute_graph, LocaleController.getString("NotificationsChartTitle", R.string.NotificationsChartTitle), 0);
 
+                if (chartsViewData[2] != null) {
+                    chartsViewData[2].useHourFormat = true;
+                }
+
                 overviewChannelData = new OverviewChannelData(stats);
                 maxDateOverview = stats.period.max_date * 1000L;
                 minDateOverview = stats.period.min_date * 1000L;
@@ -206,7 +212,7 @@ public class StatisticActivity extends BaseFragment implements NotificationCente
                 if (recentPostsAll.size() > 0) {
                     int lastPostId = recentPostsAll.get(0).counters.msg_id;
                     int count = recentPostsAll.size();
-                    getMessagesStorage().getMessages(-chat.id, 0, false, count, lastPostId, 0, 0, classGuid, 0, true, false, 0);
+                    getMessagesStorage().getMessages(-chat.id, 0, false, count, lastPostId, 0, 0, classGuid, 0, true, false, 0, 0, true);
                 }
 
                 AndroidUtilities.runOnUIThread(() -> {
@@ -238,6 +244,13 @@ public class StatisticActivity extends BaseFragment implements NotificationCente
                 chartsViewData[5] = createViewData(stats.actions_graph, LocaleController.getString("ActionsChartTitle", R.string.ActionsChartTitle), 1);
                 chartsViewData[6] = createViewData(stats.top_hours_graph, LocaleController.getString("TopHoursChartTitle", R.string.TopHoursChartTitle), 0);
                 chartsViewData[7] = createViewData(stats.weekdays_graph, LocaleController.getString("TopDaysOfWeekChartTitle", R.string.TopDaysOfWeekChartTitle), 4);
+
+                if (chartsViewData[6] != null) {
+                    chartsViewData[6].useHourFormat = true;
+                }
+                if (chartsViewData[7] != null) {
+                    chartsViewData[7].useWeekFormat = true;
+                }
 
                 overviewChatData = new OverviewChatData(stats);
                 maxDateOverview = stats.period.max_date * 1000L;
@@ -398,7 +411,7 @@ public class StatisticActivity extends BaseFragment implements NotificationCente
         imageView.playAnimation();
 
         TextView loadingTitle = new TextView(context);
-        loadingTitle.setTextSize(20);
+        loadingTitle.setTextSize(TypedValue.COMPLEX_UNIT_DIP, 20);
         loadingTitle.setTypeface(AndroidUtilities.getTypeface("fonts/rmedium.ttf"));
         loadingTitle.setTextColor(Theme.getColor(Theme.key_player_actionBarTitle));
         loadingTitle.setTag(Theme.key_player_actionBarTitle);
@@ -406,7 +419,7 @@ public class StatisticActivity extends BaseFragment implements NotificationCente
         loadingTitle.setGravity(Gravity.CENTER_HORIZONTAL);
 
         TextView loadingSubtitle = new TextView(context);
-        loadingSubtitle.setTextSize(15);
+        loadingSubtitle.setTextSize(TypedValue.COMPLEX_UNIT_DIP, 15);
         loadingSubtitle.setTextColor(Theme.getColor(Theme.key_player_actionBarSubtitle));
         loadingSubtitle.setTag(Theme.key_player_actionBarSubtitle);
         loadingSubtitle.setText(LocaleController.getString("LoadingStatsDescription", R.string.LoadingStatsDescription));
@@ -447,13 +460,8 @@ public class StatisticActivity extends BaseFragment implements NotificationCente
         recyclerListView.setOnItemClickListener((view, position) -> {
             if (position >= adapter.recentPostsStartRow && position <= adapter.recentPostsEndRow) {
                 MessageObject messageObject = recentPostsLoaded.get(position - adapter.recentPostsStartRow).message;
-
-                Bundle bundle = new Bundle();
-                bundle.putInt("chat_id", chat.id);
-                bundle.putInt("message_id", messageObject.getId());
-                bundle.putBoolean("need_remove_previous_same_chat_activity", false);
-                ChatActivity chatActivity = new ChatActivity(bundle);
-                presentFragment(chatActivity, false);
+                MessageStatisticActivity activity = new MessageStatisticActivity(messageObject);
+                presentFragment(activity);
             } else if (position >= adapter.topAdminsStartRow && position <= adapter.topAdminsEndRow) {
                 int i = position - adapter.topAdminsStartRow;
                 topAdmins.get(i).onClick(this);
@@ -478,7 +486,40 @@ public class StatisticActivity extends BaseFragment implements NotificationCente
         });
 
         recyclerListView.setOnItemLongClickListener((view, position) -> {
-            if (position >= adapter.topAdminsStartRow && position <= adapter.topAdminsEndRow) {
+            if (position >= adapter.recentPostsStartRow && position <= adapter.recentPostsEndRow) {
+                MessageObject messageObject = recentPostsLoaded.get(position - adapter.recentPostsStartRow).message;
+
+                final ArrayList<String> items = new ArrayList<>();
+                final ArrayList<Integer> actions = new ArrayList<>();
+                final ArrayList<Integer> icons = new ArrayList<>();
+
+                items.add(LocaleController.getString("ViewMessageStatistic", R.string.ViewMessageStatistic));
+                actions.add(0);
+                icons.add(R.drawable.msg_stats);
+
+                items.add(LocaleController.getString("ViewMessage", R.string.ViewMessage));
+                actions.add(1);
+                icons.add(R.drawable.menu_chats);
+
+
+                AlertDialog.Builder builder = new AlertDialog.Builder(getParentActivity());
+                builder.setItems(items.toArray(new CharSequence[actions.size()]), AndroidUtilities.toIntArray(icons), (dialogInterface, i) -> {
+                    if (i == 0) {
+                        MessageStatisticActivity activity = new MessageStatisticActivity(messageObject);
+                        presentFragment(activity);
+                    } else if (i == 1) {
+                        Bundle bundle = new Bundle();
+                        bundle.putInt("chat_id", chat.id);
+                        bundle.putInt("message_id", messageObject.getId());
+                        bundle.putBoolean("need_remove_previous_same_chat_activity", false);
+                        ChatActivity chatActivity = new ChatActivity(bundle);
+                        presentFragment(chatActivity, false);
+                    }
+                });
+
+                showDialog(builder.create());
+
+            } else if (position >= adapter.topAdminsStartRow && position <= adapter.topAdminsEndRow) {
                 int i = position - adapter.topAdminsStartRow;
                 topAdmins.get(i).onLongClick(chat, this, progressDialog);
                 return true;
@@ -537,11 +578,12 @@ public class StatisticActivity extends BaseFragment implements NotificationCente
         return fragmentView;
     }
 
-    private ChartViewData createViewData(TLRPC.StatsGraph graph, String title, int graphType, boolean isLanguages) {
+    public static ChartViewData createViewData(TLRPC.StatsGraph graph, String title, int graphType, boolean isLanguages) {
         if (graph == null || graph instanceof TLRPC.TL_statsGraphError) {
             return null;
         }
         ChartViewData viewData = new ChartViewData(title, graphType);
+        viewData.isLanguages = isLanguages;
         if (graph instanceof TLRPC.TL_statsGraph) {
             String json = ((TLRPC.TL_statsGraph) graph).json.data;
             try {
@@ -566,11 +608,11 @@ public class StatisticActivity extends BaseFragment implements NotificationCente
         return viewData;
     }
 
-    private ChartViewData createViewData(TLRPC.StatsGraph graph, String title, int graphType) {
+    private static ChartViewData createViewData(TLRPC.StatsGraph graph, String title, int graphType) {
         return createViewData(graph, title, graphType, false);
     }
 
-    private static ChartData createChartData(JSONObject jsonObject, int graphType, boolean isLanguages) throws JSONException {
+    public static ChartData createChartData(JSONObject jsonObject, int graphType, boolean isLanguages) throws JSONException {
         if (graphType == 0) {
             return new ChartData(jsonObject);
         } else if (graphType == 1) {
@@ -653,8 +695,7 @@ public class StatisticActivity extends BaseFragment implements NotificationCente
                     (position >= topMembersStartRow && position <= topMembersEndRow) ||
                     (position >= topInviterStartRow && position <= topInviterEndRow)) {
                 return 9;
-            }
-            if (position == expandTopMembersRow) {
+            } else if (position == expandTopMembersRow) {
                 return 15;
             } else {
                 return 10;
@@ -663,7 +704,7 @@ public class StatisticActivity extends BaseFragment implements NotificationCente
 
         @Override
         public long getItemId(int position) {
-            if (position >= recentPostsStartRow && position <= recentPostsEndRow) {
+            if (position >= recentPostsStartRow && position < recentPostsEndRow) {
                 return recentPostsLoaded.get(position - recentPostsStartRow).counters.msg_id;
             }
             if (position == growCell) {
@@ -704,7 +745,7 @@ public class StatisticActivity extends BaseFragment implements NotificationCente
         public RecyclerView.ViewHolder onCreateViewHolder(@NonNull ViewGroup parent, int viewType) {
             View v;
             if (viewType >= 0 && viewType <= 4) {
-                v = new ChartCell(parent.getContext(), viewType) {
+                v = new ChartCell(parent.getContext(), viewType, sharedUi) {
                     @Override
                     protected void onDraw(Canvas canvas) {
                         if (getTranslationY() != 0) {
@@ -1059,7 +1100,97 @@ public class StatisticActivity extends BaseFragment implements NotificationCente
         }
     }
 
-    public class ChartCell extends FrameLayout {
+    private class ChartCell extends BaseChartCell {
+
+        public ChartCell(@NonNull Context context, int type, BaseChartView.SharedUiComponents sharedUi) {
+            super(context, type, sharedUi);
+        }
+
+        @Override
+        public void zoomCanceled() {
+            cancelZoom();
+        }
+
+        @Override
+        public void onZoomed() {
+            if (data.activeZoom > 0) {
+                return;
+            }
+            performClick();
+            if (!chartView.legendSignatureView.canGoZoom) {
+                return;
+            }
+            final long x = chartView.getSelectedDate();
+            if (chartType == 4) {
+                data.childChartData = new StackLinearChartData(data.chartData, x);
+                zoomChart(false);
+                return;
+            }
+
+            if (data.zoomToken == null) {
+                return;
+            }
+
+            cancelZoom();
+            final String cacheKey = data.zoomToken + "_" + x;
+            ChartData dataFromCache = childDataCache.get(cacheKey);
+            if (dataFromCache != null) {
+                data.childChartData = dataFromCache;
+                zoomChart(false);
+                return;
+            }
+
+            TLRPC.TL_stats_loadAsyncGraph request = new TLRPC.TL_stats_loadAsyncGraph();
+            request.token = data.zoomToken;
+            if (x != 0) {
+                request.x = x;
+                request.flags |= 1;
+            }
+            ZoomCancelable finalCancelabel;
+            lastCancelable = finalCancelabel = new ZoomCancelable();
+            finalCancelabel.adapterPosition = recyclerListView.getChildAdapterPosition(ChartCell.this);
+
+            chartView.legendSignatureView.showProgress(true, false);
+
+            int reqId = ConnectionsManager.getInstance(currentAccount).sendRequest(request, (response, error) -> {
+                ChartData childData = null;
+                if (response instanceof TLRPC.TL_statsGraph) {
+                    String json = ((TLRPC.TL_statsGraph) response).json.data;
+                    try {
+                        childData = createChartData(new JSONObject(json), data.graphType, data == languagesData);
+                    } catch (JSONException e) {
+                        e.printStackTrace();
+                    }
+                } else if (response instanceof TLRPC.TL_statsGraphError) {
+                    Toast.makeText(getContext(), ((TLRPC.TL_statsGraphError) response).error, Toast.LENGTH_LONG).show();
+                }
+
+                ChartData finalChildData = childData;
+                AndroidUtilities.runOnUIThread(() -> {
+                    if (finalChildData != null) {
+                        childDataCache.put(cacheKey, finalChildData);
+                    }
+                    if (finalChildData != null && !finalCancelabel.canceled && finalCancelabel.adapterPosition >= 0) {
+                        View view = layoutManager.findViewByPosition(finalCancelabel.adapterPosition);
+                        if (view instanceof ChartCell) {
+                            data.childChartData = finalChildData;
+                            ((ChartCell) view).chartView.legendSignatureView.showProgress(false, false);
+                            ((ChartCell) view).zoomChart(false);
+                        }
+                    }
+                    cancelZoom();
+                });
+            }, null, null, 0, chat.stats_dc, ConnectionsManager.ConnectionTypeGeneric, true);
+            ConnectionsManager.getInstance(currentAccount).bindRequestToGuid(reqId, classGuid);
+        }
+
+        @Override
+        public void loadData(ChartViewData viewData) {
+            viewData.load(currentAccount, classGuid, chat.stats_dc, recyclerListView, adapter, diffUtilsCallback);
+        }
+    }
+
+    public static abstract class BaseChartCell extends FrameLayout {
         BaseChartView chartView;
         BaseChartView zoomedChartView;
         ChartHeaderView chartHeaderView;
@@ -1074,7 +1205,7 @@ public class StatisticActivity extends BaseFragment implements NotificationCente
         int chartType;
 
         @SuppressLint("ClickableViewAccessibility")
-        public ChartCell(@NonNull Context context, int type) {
+        public BaseChartCell(@NonNull Context context, int type, BaseChartView.SharedUiComponents sharedUi) {
             super(context);
             setWillNotDraw(false);
             chartType = type;
@@ -1160,7 +1291,7 @@ public class StatisticActivity extends BaseFragment implements NotificationCente
             frameLayout.addView(progressView, LayoutHelper.createFrame(44, 44, Gravity.CENTER, 0, 0, 0, 60));
 
             errorTextView = new TextView(context);
-            errorTextView.setTextSize(15);
+            errorTextView.setTextSize(TypedValue.COMPLEX_UNIT_DIP, 15);
             frameLayout.addView(errorTextView, LayoutHelper.createFrame(LayoutHelper.WRAP_CONTENT, LayoutHelper.WRAP_CONTENT, Gravity.CENTER, 0, 0, 0, 30));
             progressView.setVisibility(View.GONE);
 
@@ -1168,83 +1299,14 @@ public class StatisticActivity extends BaseFragment implements NotificationCente
 
 
             chartView.setDateSelectionListener(date -> {
-                cancelZoom();
+                zoomCanceled();
                 chartView.legendSignatureView.showProgress(false, false);
             });
 
             chartView.legendSignatureView.showProgress(false, false);
             chartView.legendSignatureView.setOnTouchListener(new RecyclerListView.FoucsableOnTouchListener());
             chartView.legendSignatureView.setOnClickListener(v -> {
-                if (data.activeZoom > 0) {
-                    return;
-                }
-                performClick();
-                if (!chartView.legendSignatureView.canGoZoom) {
-                    return;
-                }
-                final long x = chartView.getSelectedDate();
-                if (chartType == 4) {
-                    data.childChartData = new StackLinearChartData(data.chartData, x);
-                    zoomChart(false);
-                    return;
-                }
-
-                if (data.zoomToken == null) {
-                    return;
-                }
-
-                cancelZoom();
-                final String cacheKey = data.zoomToken + "_" + x;
-                ChartData dataFromCache = childDataCache.get(cacheKey);
-                if (dataFromCache != null) {
-                    data.childChartData = dataFromCache;
-                    zoomChart(false);
-                    return;
-                }
-
-                TLRPC.TL_stats_loadAsyncGraph request = new TLRPC.TL_stats_loadAsyncGraph();
-                request.token = data.zoomToken;
-                if (x != 0) {
-                    request.x = x;
-                    request.flags |= 1;
-                }
-                ZoomCancelable finalCancelabel;
-                lastCancelable = finalCancelabel = new ZoomCancelable();
-                finalCancelabel.adapterPosition = recyclerListView.getChildAdapterPosition(ChartCell.this);
-
-                chartView.legendSignatureView.showProgress(true, false);
-
-                int reqId = ConnectionsManager.getInstance(currentAccount).sendRequest(request, (response, error) -> {
-                    ChartData childData = null;
-                    if (response instanceof TLRPC.TL_statsGraph) {
-                        String json = ((TLRPC.TL_statsGraph) response).json.data;
-                        try {
-                            childData = createChartData(new JSONObject(json), data.graphType, data == languagesData);
-                        } catch (JSONException e) {
-                            e.printStackTrace();
-                        }
-                    } else if (response instanceof TLRPC.TL_statsGraphError) {
-                        Toast.makeText(context, ((TLRPC.TL_statsGraphError) response).error, Toast.LENGTH_LONG).show();
-                    }
-
-                    ChartData finalChildData = childData;
-                    AndroidUtilities.runOnUIThread(() -> {
-                        if (finalChildData != null) {
-                            childDataCache.put(cacheKey, finalChildData);
-                        }
-                        if (finalChildData != null && !finalCancelabel.canceled && finalCancelabel.adapterPosition >= 0) {
-                            View view = layoutManager.findViewByPosition(finalCancelabel.adapterPosition);
-                            if (view instanceof ChartCell) {
-                                data.childChartData = finalChildData;
-                                ((ChartCell) view).chartView.legendSignatureView.showProgress(false, false);
-                                ((ChartCell) view).zoomChart(false);
-                            }
-                        }
-                        cancelZoom();
-                    });
-                }, null, null, 0, chat.stats_dc, ConnectionsManager.ConnectionTypeGeneric, true);
-                ConnectionsManager.getInstance(currentAccount).bindRequestToGuid(reqId, classGuid);
-
+                onZoomed();
             });
             zoomedChartView.legendSignatureView.setOnClickListener(v -> {
                 zoomedChartView.animateLegend(false);
@@ -1267,7 +1329,13 @@ public class StatisticActivity extends BaseFragment implements NotificationCente
             addView(linearLayout);
         }
 
-        private void zoomChart(boolean skipTransition) {
+        public abstract void onZoomed();
+
+        public abstract void zoomCanceled();
+
+        abstract void loadData(ChartViewData viewData);
+
+        public void zoomChart(boolean skipTransition) {
             long d = chartView.getSelectedDate();
             ChartData childData = data.childChartData;
             // if (childData == null) return;
@@ -1504,13 +1572,13 @@ public class StatisticActivity extends BaseFragment implements NotificationCente
             }
 
             errorTextView.setVisibility(View.GONE);
-            chartView.legendSignatureView.isTopHourChart = viewData == topHoursData;
-            chartHeaderView.showDate(viewData != topHoursData);
+            chartView.legendSignatureView.isTopHourChart = viewData.useHourFormat;
+            chartHeaderView.showDate(!viewData.useHourFormat);
 
             if (viewData.chartData == null && viewData.token != null) {
                 progressView.setAlpha(1f);
                 progressView.setVisibility(View.VISIBLE);
-                viewData.load(currentAccount, classGuid, chat.stats_dc, recyclerListView, adapter, diffUtilsCallback);
+                loadData(viewData);
                 chartView.setData(null);
                 return;
             } else if (!enterTransition) {
@@ -1518,8 +1586,8 @@ public class StatisticActivity extends BaseFragment implements NotificationCente
             }
 
             chartView.setData(viewData.chartData);
-            chartHeaderView.setUseWeekInterval(viewData == topDayOfWeeksData);
-            chartView.legendSignatureView.setUseWeek(viewData == topDayOfWeeksData);
+            chartHeaderView.setUseWeekInterval(viewData.useWeekFormat);
+            chartView.legendSignatureView.setUseWeek(viewData.useWeekFormat);
 
             chartView.legendSignatureView.zoomEnabled = !(data.zoomToken == null && chartType != 4);
             zoomedChartView.legendSignatureView.zoomEnabled = false;
@@ -1630,7 +1698,7 @@ public class StatisticActivity extends BaseFragment implements NotificationCente
                             break;
                         }
                     }
-                    cancelZoom();
+                    zoomCanceled();
                     if (allDisabled) {
                         checkBox.denied();
                         return;
@@ -1651,7 +1719,7 @@ public class StatisticActivity extends BaseFragment implements NotificationCente
                     if (!checkBox.enabled) {
                         return false;
                     }
-                    cancelZoom();
+                    zoomCanceled();
                     int n = checkBoxes.size();
                     for (int i = 0; i < n; i++) {
                         checkBoxes.get(i).checkBox.setChecked(false);
@@ -1694,12 +1762,12 @@ public class StatisticActivity extends BaseFragment implements NotificationCente
     }
 
 
-    private static class ZoomCancelable {
+    public static class ZoomCancelable {
         int adapterPosition;
         boolean canceled;
     }
 
-    private class ChartViewData {
+    public static class ChartViewData {
 
         public boolean isError;
         public String errorMessage;
@@ -1715,6 +1783,9 @@ public class StatisticActivity extends BaseFragment implements NotificationCente
 
         boolean loading;
         boolean isEmpty;
+        boolean isLanguages;
+        boolean useHourFormat;
+        boolean useWeekFormat;
 
         public ChartViewData(String title, int grahType) {
             this.title = title;
@@ -1733,7 +1804,7 @@ public class StatisticActivity extends BaseFragment implements NotificationCente
                         if (response instanceof TLRPC.TL_statsGraph) {
                             String json = ((TLRPC.TL_statsGraph) response).json.data;
                             try {
-                                chartData = createChartData(new JSONObject(json), graphType, this == languagesData);
+                                chartData = createChartData(new JSONObject(json), graphType, isLanguages);
                                 zoomToken = ((TLRPC.TL_statsGraph) response).zoom_token;
                                 if (graphType == 4 && chartData.x != null && chartData.x.length > 0) {
                                     long x = chartData.x[chartData.x.length - 1];
@@ -1847,19 +1918,15 @@ public class StatisticActivity extends BaseFragment implements NotificationCente
     private void recolorRecyclerItem(View child) {
         if (child instanceof ChartCell) {
             ((ChartCell) child).recolor();
-        }
-
-        if (child instanceof ShadowSectionCell) {
+        } else if (child instanceof ShadowSectionCell) {
             Drawable shadowDrawable = Theme.getThemedDrawable(ApplicationLoader.applicationContext, R.drawable.greydivider, Theme.key_windowBackgroundGrayShadow);
             Drawable background = new ColorDrawable(Theme.getColor(Theme.key_windowBackgroundGray));
             CombinedDrawable combinedDrawable = new CombinedDrawable(background, shadowDrawable, 0, 0);
             combinedDrawable.setFullsize(true);
             child.setBackground(combinedDrawable);
-        }
-        if (child instanceof ChartHeaderView) {
+        } else if (child instanceof ChartHeaderView) {
             ((ChartHeaderView) child).recolor();
-        }
-        if (child instanceof OverviewCell) {
+        } else if (child instanceof OverviewCell) {
             ((OverviewCell) child).updateColors();
         }
     }
@@ -2083,7 +2150,6 @@ public class StatisticActivity extends BaseFragment implements NotificationCente
         arrayList.add(new ThemeDescription(recyclerListView, ThemeDescription.FLAG_CHECKTAG, new Class[]{ManageChatTextCell.class}, new String[]{"textView"}, null, null, null, Theme.key_windowBackgroundWhiteRedText5));
         arrayList.add(new ThemeDescription(recyclerListView, ThemeDescription.FLAG_CELLBACKGROUNDCOLOR, new Class[]{ManageChatUserCell.class, ManageChatTextCell.class, HeaderCell.class, TextView.class, PeopleNearbyActivity.HintInnerCell.class}, null, null, null, Theme.key_windowBackgroundWhite));
 
-
         if (isMegagroup) {
             for (int i = 0; i < 6; i++) {
                 ChartViewData chartViewData;
@@ -2131,7 +2197,7 @@ public class StatisticActivity extends BaseFragment implements NotificationCente
         return arrayList;
     }
 
-    private void putColorFromData(ChartViewData chartViewData, ArrayList<ThemeDescription> arrayList, ThemeDescription.ThemeDescriptionDelegate themeDelegate) {
+    public static void putColorFromData(ChartViewData chartViewData, ArrayList<ThemeDescription> arrayList, ThemeDescription.ThemeDescriptionDelegate themeDelegate) {
         if (chartViewData != null && chartViewData.chartData != null) {
             for (ChartData.Line l : chartViewData.chartData.lines) {
                 if (l.colorKey != null) {
@@ -2317,9 +2383,9 @@ public class StatisticActivity extends BaseFragment implements NotificationCente
                     title[i * 2 + j] = new TextView(context);
 
                     primary[i * 2 + j].setTypeface(AndroidUtilities.getTypeface("fonts/rmedium.ttf"));
-                    primary[i * 2 + j].setTextSize(17);
-                    title[i * 2 + j].setTextSize(13);
-                    secondary[i * 2 + j].setTextSize(13);
+                    primary[i * 2 + j].setTextSize(TypedValue.COMPLEX_UNIT_DIP, 17);
+                    title[i * 2 + j].setTextSize(TypedValue.COMPLEX_UNIT_DIP, 13);
+                    secondary[i * 2 + j].setTextSize(TypedValue.COMPLEX_UNIT_DIP, 13);
 
                     secondary[i * 2 + j].setPadding(AndroidUtilities.dp(4), 0, 0, 0);
 
@@ -2391,7 +2457,6 @@ public class StatisticActivity extends BaseFragment implements NotificationCente
                     secondary[i].setTextColor(Theme.getColor(colorKey));
                 }
             }
-
         }
     }
 
@@ -2576,11 +2641,18 @@ public class StatisticActivity extends BaseFragment implements NotificationCente
             }
 
             boolean isAdmin = false;
-            if (currentUser != null && currentParticipant != null && currentUser.channelParticipant.admin_rights != null && currentUser.channelParticipant.admin_rights.add_admins) {
-                isAdmin = currentParticipant.channelParticipant.admin_rights == null;
-                items.add(isAdmin ? LocaleController.getString("SetAsAdmin", R.string.SetAsAdmin) : LocaleController.getString("EditAdminRights", R.string.EditAdminRights));
-                icons.add(isAdmin ? R.drawable.actions_addadmin : R.drawable.actions_permissions);
-                actions.add(0);
+            if (currentUser != null && currentParticipant != null && currentUser.user_id != currentParticipant.user_id) {
+                TLRPC.ChannelParticipant channelParticipant = currentParticipant.channelParticipant;
+                boolean canEditAdmin = currentUser.channelParticipant.admin_rights != null && currentUser.channelParticipant.admin_rights.add_admins;
+                if (canEditAdmin && (channelParticipant instanceof TLRPC.TL_channelParticipantCreator || channelParticipant instanceof TLRPC.TL_channelParticipantAdmin && !channelParticipant.can_edit)) {
+                    canEditAdmin = false;
+                }
+                if (canEditAdmin) {
+                    isAdmin = channelParticipant.admin_rights == null;
+                    items.add(isAdmin ? LocaleController.getString("SetAsAdmin", R.string.SetAsAdmin) : LocaleController.getString("EditAdminRights", R.string.EditAdminRights));
+                    icons.add(isAdmin ? R.drawable.actions_addadmin : R.drawable.actions_permissions);
+                    actions.add(0);
+                }
             }
 
             AlertDialog.Builder builder = new AlertDialog.Builder(fragment.getParentActivity());
@@ -2588,7 +2660,15 @@ public class StatisticActivity extends BaseFragment implements NotificationCente
             boolean finalIsAdmin = isAdmin;
             builder.setItems(items.toArray(new CharSequence[actions.size()]), AndroidUtilities.toIntArray(icons), (dialogInterface, i) -> {
                 if (actions.get(i) == 0) {
-                    ChatRightsEditActivity newFragment = new ChatRightsEditActivity(user.id, chat.id, finalCurrentParticipant.channelParticipant.admin_rights, null, finalCurrentParticipant.channelParticipant.banned_rights, finalCurrentParticipant.channelParticipant.rank, ChatRightsEditActivity.TYPE_ADMIN, true, finalIsAdmin);
+                    boolean[] needShowBulletin = new boolean[1];
+                    ChatRightsEditActivity newFragment = new ChatRightsEditActivity(user.id, chat.id, finalCurrentParticipant.channelParticipant.admin_rights, null, finalCurrentParticipant.channelParticipant.banned_rights, finalCurrentParticipant.channelParticipant.rank, ChatRightsEditActivity.TYPE_ADMIN, true, finalIsAdmin) {
+                        @Override
+                        protected void onTransitionAnimationEnd(boolean isOpen, boolean backward) {
+                            if (!isOpen && backward && needShowBulletin[0] && BulletinFactory.canShowBulletin(fragment)) {
+                                BulletinFactory.createPromoteToAdminBulletin(fragment, user.first_name).show();
+                            }
+                        }
+                    };
                     newFragment.setDelegate(new ChatRightsEditActivity.ChatRightsEditActivityDelegate() {
                         @Override
                         public void didSetRights(int rights, TLRPC.TL_chatAdminRights rightsAdmin, TLRPC.TL_chatBannedRights rightsBanned, String rank) {
@@ -2598,6 +2678,9 @@ public class StatisticActivity extends BaseFragment implements NotificationCente
                             } else {
                                 finalCurrentParticipant.channelParticipant.admin_rights = rightsAdmin;
                                 finalCurrentParticipant.channelParticipant.rank = rank;
+                                if (finalIsAdmin) {
+                                    needShowBulletin[0] = true;
+                                }
                             }
                         }
 

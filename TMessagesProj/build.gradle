@@ -1,9 +1,20 @@
-apply plugin: 'com.android.application'
+buildscript {
+    apply from: "$project.projectDir/internal_helpers.gradle"
 
-repositories {
-    mavenCentral()
-    google()
-    jcenter()
+    if (isInternalProjectBuild() && rootProject.findProject(':plugins:star-app') != null) {
+        dependencies {
+            classpath 'ru.sberdevices.starplugin:star-app'
+        }
+    }
+}
+
+plugins {
+    id 'com.android.application'
+    id 'kotlin-android'
+}
+
+if (isInternalProjectBuild()) {
+    apply plugin: 'ru.sberdevices.starapp'
 }
 
 configurations {
@@ -12,51 +23,29 @@ configurations {
 
 configurations.all {
     exclude group: 'com.google.firebase', module: 'firebase-core'
-}
-
-dependencies {
-    implementation 'androidx.core:core:1.3.1'
-    implementation 'androidx.palette:palette:1.0.0'
-    implementation 'androidx.exifinterface:exifinterface:1.2.0'
-    implementation 'androidx.dynamicanimation:dynamicanimation:1.0.0'
-    implementation 'androidx.multidex:multidex:2.0.1'
-    implementation "androidx.sharetarget:sharetarget:1.0.0"
-
-    compileOnly 'org.checkerframework:checker-qual:2.5.2'
-    compileOnly 'org.checkerframework:checker-compat-qual:2.5.0'
-    implementation 'com.google.firebase:firebase-messaging:20.2.4'
-    implementation 'com.google.firebase:firebase-config:19.2.0'
-    implementation 'com.google.firebase:firebase-datatransport:17.0.6'
-    implementation 'com.google.android.gms:play-services-maps:17.0.0'
-    implementation 'com.google.android.gms:play-services-auth:18.1.0'
-    implementation 'com.google.android.gms:play-services-vision:16.2.0'
-    implementation 'com.google.android.gms:play-services-wearable:17.0.0'
-    implementation 'com.google.android.gms:play-services-location:17.0.0'
-    implementation "com.microsoft.appcenter:appcenter-distribute:3.2.2"
-    implementation "com.microsoft.appcenter:appcenter-crashes:3.2.2"
-    implementation 'com.googlecode.mp4parser:isoparser:1.0.6'
-    implementation 'com.stripe:stripe-android:2.0.2'
-    implementation files('libs/libgsaverification-client.aar')
-
-    coreLibraryDesugaring 'com.android.tools:desugar_jdk_libs:1.0.10'
+    exclude group: 'androidx.recyclerview', module: 'recyclerview'
+    exclude group: 'com.google.protobuf', module: 'protobuf-javalite'
 }
 
 android {
-    compileSdkVersion 30
-    buildToolsVersion '30.0.2'
+    compileSdkVersion 29
+    buildToolsVersion '29.0.2'
     ndkVersion "21.1.6352462"
 
-    defaultConfig.applicationId = "org.telegram.messenger"
+    defaultConfig.applicationId = "ru.sberdevices.telegramcalls"
 
     sourceSets.main.jniLibs.srcDirs = ['./jni/']
 
     externalNativeBuild {
-        ndkBuild {
-            path "jni/Android.mk"
+        cmake {
+            version '3.18.1'
+            path 'jni/CMakeLists.txt'
         }
     }
 
     lintOptions {
+        abortOnError false
+        baseline file("config/lint-baseline.xml")
         disable 'MissingTranslation'
         disable 'ExtraTranslation'
         disable 'BlockedPrivateApi'
@@ -69,24 +58,15 @@ android {
     compileOptions {
         sourceCompatibility JavaVersion.VERSION_1_8
         targetCompatibility JavaVersion.VERSION_1_8
-
-        coreLibraryDesugaringEnabled true
     }
 
-    signingConfigs {
-        debug {
-            storeFile file("config/release.keystore")
-            storePassword RELEASE_STORE_PASSWORD
-            keyAlias RELEASE_KEY_ALIAS
-            keyPassword RELEASE_KEY_PASSWORD
-        }
+    kotlinOptions {
+        jvmTarget = JavaVersion.VERSION_1_8.toString()
+    }
 
-        release {
-            storeFile file("config/release.keystore")
-            storePassword RELEASE_STORE_PASSWORD
-            keyAlias RELEASE_KEY_ALIAS
-            keyPassword RELEASE_KEY_PASSWORD
-        }
+    packagingOptions {
+        exclude 'META-INF/DEPENDENCIES'
+        exclude("META-INF/*.kotlin_module")
     }
 
     buildTypes {
@@ -94,47 +74,9 @@ android {
             debuggable true
             jniDebuggable true
             signingConfig signingConfigs.debug
-            applicationIdSuffix ".beta"
-            minifyEnabled true
-            multiDexEnabled true
-            proguardFiles getDefaultProguardFile('proguard-android.txt'), 'proguard-rules.pro'
-        }
-
-        /*debugAsan {
-            debuggable true
-            jniDebuggable true
-            signingConfig signingConfigs.debug
-            applicationIdSuffix ".beta"
-            minifyEnabled true
-            multiDexEnabled true
-            proguardFiles getDefaultProguardFile('proguard-android.txt'), 'proguard-rules.pro'
-
-            packagingOptions {
-                doNotStrip "**.so"
-            }
-
-            sourceSets {
-                main {
-                    jniLibs {
-                        srcDir {
-                            'jniLibs'
-                        }
-                    }
-                    resources {
-                        srcDir {
-                            'jniRes'
-                        }
-                    }
-                }
-            }
-        }*/
-
-        HA {
-            debuggable false
-            jniDebuggable false
-            signingConfig signingConfigs.debug
-            applicationIdSuffix ".beta"
-            minifyEnabled true
+            applicationIdSuffix ""
+            minifyEnabled false
+            shrinkResources false
             multiDexEnabled true
             proguardFiles getDefaultProguardFile('proguard-android.txt'), 'proguard-rules.pro'
         }
@@ -142,7 +84,6 @@ android {
         release {
             debuggable false
             jniDebuggable false
-            signingConfig signingConfigs.release
             minifyEnabled true
             shrinkResources false
             multiDexEnabled true
@@ -154,177 +95,96 @@ android {
         manifest.srcFile 'config/debug/AndroidManifest.xml'
     }
 
-    /*sourceSets.debugAsan {
-        manifest.srcFile 'config/debug/AndroidManifest.xml'
-    }*/
-
-    sourceSets.HA {
-        manifest.srcFile 'config/debug/AndroidManifest.xml'
-    }
-
     sourceSets.release {
         manifest.srcFile 'config/release/AndroidManifest.xml'
     }
 
-    flavorDimensions "minApi"
-
-    productFlavors {
-        armv7 {
-            ndk {
-                abiFilters "armeabi-v7a"
-            }
-            ext {
-                abiVersionCode = 1
-            }
-        }
-        x86 {
-            ndk {
-                abiFilters "x86"
-            }
-            ext {
-                abiVersionCode = 2
-            }
-        }
-        armv7_SDK23 {
-            ndk {
-                abiFilters "armeabi-v7a"
-            }
-            sourceSets.debug {
-                manifest.srcFile 'config/debug/AndroidManifest_SDK23.xml'
-            }
-            sourceSets.release {
-                manifest.srcFile 'config/release/AndroidManifest_SDK23.xml'
-            }
-            minSdkVersion 23
-            ext {
-                abiVersionCode = 3
-            }
-        }
-        x86_SDK23 {
-            ndk {
-                abiFilters "x86"
-            }
-            sourceSets.debug {
-                manifest.srcFile 'config/debug/AndroidManifest_SDK23.xml'
-            }
-            sourceSets.release {
-                manifest.srcFile 'config/release/AndroidManifest_SDK23.xml'
-            }
-            minSdkVersion 23
-            ext {
-                abiVersionCode = 4
-            }
-        }
-        arm64 {
-            ndk {
-                abiFilters "arm64-v8a"
-            }
-            ext {
-                abiVersionCode = 5
-            }
-        }
-        x64 {
-            ndk {
-                abiFilters "x86_64"
-            }
-            ext {
-                abiVersionCode = 6
-            }
-        }
-        arm64_SDK23 {
-            ndk {
-                abiFilters "arm64-v8a"
-            }
-            sourceSets.debug {
-                manifest.srcFile 'config/debug/AndroidManifest_SDK23.xml'
-            }
-            /*sourceSets.debugAsan {
-                manifest.srcFile 'config/debug/AndroidManifest_SDK23.xml'
-            }*/
-            sourceSets.release {
-                manifest.srcFile 'config/release/AndroidManifest_SDK23.xml'
-            }
-            minSdkVersion 23
-            ext {
-                abiVersionCode = 7
-            }
-        }
-        x64_SDK23 {
-            ndk {
-                abiFilters "x86_64"
-            }
-            sourceSets.debug {
-                manifest.srcFile 'config/debug/AndroidManifest_SDK23.xml'
-            }
-            sourceSets.release {
-                manifest.srcFile 'config/release/AndroidManifest_SDK23.xml'
-            }
-            minSdkVersion 23
-            ext {
-                abiVersionCode = 8
-            }
-        }
-        afat {
-            sourceSets.debug {
-                manifest.srcFile 'config/debug/AndroidManifest_SDK23.xml'
-            }
-            /*sourceSets.debugAsan {
-                manifest.srcFile 'config/debug/AndroidManifest_SDK23.xml'
-            }*/
-            sourceSets.release {
-                manifest.srcFile 'config/release/AndroidManifest_SDK23.xml'
-            }
-            ext {
-                abiVersionCode = 9
-            }
-        }
-    }
-
-    defaultConfig.versionCode = 2065
-
-    applicationVariants.all { variant ->
-        variant.outputs.all { output ->
-            outputFileName = "app.apk"
-            output.getProcessManifestProvider().get().doLast {
-                def abiVersion = variant.productFlavors.get(0).abiVersionCode
-
-                def outputDir = manifestOutputDirectory
-                File directory
-                if (outputDir instanceof File) {
-                    directory = outputDir
-                } else {
-                    directory = outputDir.get().asFile
-                }
-
-                String manifestPath = directory.toString() + "/AndroidManifest.xml"
-                def manifestContent = file(manifestPath).getText()
-
-                manifestContent = manifestContent.replace(String.format('android:versionCode="%d"', defaultConfig.versionCode), String.format('android:versionCode="%s"', defaultConfig.versionCode * 10 + abiVersion))
-                file(manifestPath).write(manifestContent)
-            }
-        }
-    }
-
-    variantFilter { variant ->
-        def names = variant.flavors*.name
-        if (variant.buildType.name != "release" && !names.contains("afat")) {
-            setIgnore(true)
-        }
-    }
-
     defaultConfig {
-        minSdkVersion 16
-        targetSdkVersion 28
-        versionName "7.0.1"
+        minSdkVersion 28
+        targetSdkVersion 29
+        versionName "1.02"
+        versionCode = 2206 * 10 + 1
 
-        vectorDrawables.generatedDensities = ['mdpi', 'hdpi', 'xhdpi', 'xxhdpi']
+        vectorDrawables.generatedDensities = ['mdpi']
+
+        ndk {
+            abiFilters "armeabi-v7a"
+        }
 
         externalNativeBuild {
-            ndkBuild {
-                arguments "NDK_APPLICATION_MK:=jni/Application.mk", "APP_PLATFORM:=android-16", "--jobs=16"
-                abiFilters "armeabi-v7a", "arm64-v8a", "x86", "x86_64"
+            cmake {
+                version '3.18.1'
+                arguments '-DANDROID_STL=c++_static', "-j=16", "-DCMAKE_BUILD_TYPE=Release"
             }
         }
+    }
+}
+
+dependencies {
+    if (isInternalProjectBuild()) {
+        // for internal build, internal deps are placed into libs inside build folder
+        implementation fileTree(include: ['*.aar'], dir: "$project.buildDir/input_aar_libs")
+    } else {
+        // for external build, internal deps are placed into standard libs folder
+        implementation fileTree(include: ['*.aar'], dir: "libs")
+    }
+
+    implementation 'androidx.appcompat:appcompat:1.2.0'
+    implementation 'androidx.core:core:1.3.2'
+    implementation 'androidx.palette:palette:1.0.0'
+    implementation 'androidx.exifinterface:exifinterface:1.3.2'
+    implementation 'androidx.dynamicanimation:dynamicanimation:1.0.0'
+    implementation 'androidx.multidex:multidex:2.0.1'
+    implementation "androidx.sharetarget:sharetarget:1.0.0"
+
+    implementation "com.squareup.picasso:picasso:2.71828"
+
+    compileOnly 'org.checkerframework:checker-qual:2.5.2'
+    compileOnly 'org.checkerframework:checker-compat-qual:2.5.0'
+    implementation 'com.google.firebase:firebase-messaging:21.0.1'
+    implementation 'com.google.firebase:firebase-config:20.0.2'
+    implementation 'com.google.firebase:firebase-datatransport:17.0.10'
+    implementation 'com.google.firebase:firebase-appindexing:19.1.0'
+    implementation 'com.google.android.gms:play-services-maps:17.0.0'
+    implementation 'com.google.android.gms:play-services-auth:19.0.0'
+    implementation 'com.google.android.gms:play-services-vision:16.2.0'
+    implementation 'com.google.android.gms:play-services-wearable:17.0.0'
+    implementation 'com.google.android.gms:play-services-location:17.1.0'
+    implementation 'com.google.android.gms:play-services-wallet:18.1.2'
+    implementation 'com.googlecode.mp4parser:isoparser:1.0.6'
+    implementation 'com.stripe:stripe-android:2.0.2'
+    implementation files('libs/libgsaverification-client.aar')
+
+    // SberDevices
+    implementation "androidx.core:core-ktx:1.3.2"
+    implementation "androidx.constraintlayout:constraintlayout:1.1.3"
+    implementation "androidx.cardview:cardview:1.0.0"
+    implementation "androidx.legacy:legacy-support-v4:1.0.0"
+    implementation "androidx.lifecycle:lifecycle-viewmodel-ktx:2.2.0"
+    implementation "androidx.lifecycle:lifecycle-extensions:2.2.0"
+    implementation "androidx.lifecycle:lifecycle-livedata-ktx:2.2.0"
+    implementation "org.jetbrains.kotlin:kotlin-stdlib:1.4.20"
+    implementation "org.jetbrains.kotlinx:kotlinx-coroutines-core:1.4.0"
+
+    internal {
+        implementation project(':common:smartfocus')
+        implementation project(':common:text-processing')
+        implementation project(':playsync:sdk')
+        implementation project(':public:cv:impl')
+        implementation project(':public:services:appstate:impl')
+        implementation project(':services-sdk:analytics')
+        implementation project(':services-sdk:appconfig')
+        implementation project(':services-sdk:calls')
+        implementation project(':services-sdk:echocancel')
+        implementation project(':services-sdk:settings')
+    }
+
+    external {
+        implementation "ru.sberdevices.smartapp.sdk.cv:impl:3.0.0"
+        implementation "ru.sberdevices.smartapp.sdk.appstate:impl:1.0-rc1"
+        implementation "ru.sberdevices.smartapp.sdk.messaging:impl:1.0-rc1"
+
+        implementation files('libs/not-yet-on-maven-deps.aar')
     }
 }
 

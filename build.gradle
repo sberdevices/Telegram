@@ -1,15 +1,27 @@
-// Top-level build file where you can add configuration options common to all sub-projects/modules.
+/**
+ * build.gradle, used for stanalone telegram calls build
+ *
+ * @author Ilya Bogdanovich on 27.01.2021
+ */
 buildscript {
     repositories {
-        jcenter()
         mavenCentral()
+        jcenter()
         google()
     }
+
     dependencies {
-        classpath 'com.android.tools.build:gradle:4.0.1'
-        classpath 'com.google.gms:google-services:4.3.3'
+        classpath 'com.android.tools.build:gradle:4.1.1'
+        classpath 'com.google.gms:google-services:4.3.4'
+        classpath "org.jetbrains.kotlin:kotlin-gradle-plugin:1.4.20"
+        classpath "com.google.protobuf:protobuf-gradle-plugin:0.8.10"
     }
 }
-repositories {
-    google()
+
+allprojects {
+    repositories {
+        mavenCentral()
+        jcenter()
+        google()
+    }
 }

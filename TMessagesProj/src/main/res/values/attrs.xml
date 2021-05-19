@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <declare-styleable name="AvatarView">
+        <attr name="av_border_color" format="color" />
+        <attr name="av_border_width" format="dimension" />
+        <attr name="av_text_size_percentage" format="integer" />
+    </declare-styleable>
+
+    <declare-styleable name="AlphabeticRecyclerView">
+        <!-- Size -->
+        <attr name="fontSize" format="dimension" />
+        <!-- Colors -->
+        <attr name="itemsColor" format="reference" />
+        <!-- Padding -->
+        <attr name="itemHorizontalPadding" format="dimension" />
+    </declare-styleable>
+</resources>

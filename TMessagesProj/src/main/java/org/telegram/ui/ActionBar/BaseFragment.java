@@ -21,25 +21,29 @@ import android.view.Menu;
 import android.view.MotionEvent;
 import android.view.View;
 import android.view.ViewGroup;
+import android.view.ViewParent;
 import android.view.accessibility.AccessibilityManager;
+import android.widget.FrameLayout;
 
 import org.telegram.messenger.AccountInstance;
 import org.telegram.messenger.ApplicationLoader;
 import org.telegram.messenger.ContactsController;
 import org.telegram.messenger.DownloadController;
 import org.telegram.messenger.FileLoader;
-import org.telegram.messenger.MediaController;
-import org.telegram.messenger.MediaDataController;
 import org.telegram.messenger.FileLog;
 import org.telegram.messenger.LocationController;
+import org.telegram.messenger.MediaController;
+import org.telegram.messenger.MediaDataController;
 import org.telegram.messenger.MessagesController;
 import org.telegram.messenger.MessagesStorage;
 import org.telegram.messenger.NotificationCenter;
 import org.telegram.messenger.NotificationsController;
+import org.telegram.messenger.R;
 import org.telegram.messenger.SecretChatHelper;
 import org.telegram.messenger.SendMessagesHelper;
 import org.telegram.messenger.UserConfig;
 import org.telegram.tgnet.ConnectionsManager;
+import org.telegram.ui.Components.LayoutHelper;
 
 import java.util.ArrayList;
 
@@ -121,6 +125,9 @@ public class BaseFragment {
                 actionBar.setOccupyStatusBar(Build.VERSION.SDK_INT >= 21);
             }
         }
+    }
+
+    protected void onPreviewOpenAnimationEnd() {
     }
 
     protected boolean hideKeyboardOnShow() {
@@ -206,7 +213,7 @@ public class BaseFragment {
 
     protected ActionBar createActionBar(Context context) {
         ActionBar actionBar = new ActionBar(context);
-        actionBar.setBackgroundColor(Theme.getColor(Theme.key_actionBarDefault));
+        actionBar.setBackgroundResource(R.drawable.intro_frame_actionbar_background);
         actionBar.setItemsBackgroundColor(Theme.getColor(Theme.key_actionBarDefaultSelector), false);
         actionBar.setItemsBackgroundColor(Theme.getColor(Theme.key_actionBarActionModeDefaultSelector), true);
         actionBar.setItemsColor(Theme.getColor(Theme.key_actionBarDefaultIcon), false);
@@ -265,6 +272,12 @@ public class BaseFragment {
         return false;
     }
 
+    protected void resumeDelayedFragmentAnimation() {
+        if (parentLayout != null) {
+            parentLayout.resumeDelayedFragmentAnimation();
+        }
+    }
+
     public void onResume() {
         isPaused = false;
     }
@@ -317,6 +330,16 @@ public class BaseFragment {
 
     public ActionBarLayout getParentLayout() {
         return parentLayout;
+    }
+
+    public FrameLayout getLayoutContainer() {
+        if (fragmentView != null) {
+            final ViewParent parent = fragmentView.getParent();
+            if (parent instanceof FrameLayout) {
+                return (FrameLayout) parent;
+            }
+        }
+        return null;
     }
 
     public boolean presentFragmentAsPreview(BaseFragment fragment) {
@@ -414,6 +437,10 @@ public class BaseFragment {
         }
     }
 
+    protected int getPreviewHeight() {
+        return LayoutHelper.MATCH_PARENT;
+    }
+
     protected void onBecomeFullyHidden() {
 
     }
@@ -470,7 +497,7 @@ public class BaseFragment {
 
     }
 
-    protected void onPanTranslationUpdate(int y) {
+    protected void onPanTranslationUpdate(float y) {
 
     }
 
@@ -480,10 +507,6 @@ public class BaseFragment {
 
     protected void onPanTransitionEnd() {
 
-    }
-
-    public int getCurrentPanTranslationY() {
-        return parentLayout != null ? parentLayout.getCurrentPanTranslationY() : 0;
     }
 
     public Dialog getVisibleDialog() {
@@ -564,5 +587,15 @@ public class BaseFragment {
 
     public UserConfig getUserConfig() {
         return getAccountInstance().getUserConfig();
+    }
+
+    public void setFragmentPanTranslationOffset(int offset) {
+        if (parentLayout != null) {
+            parentLayout.setFragmentPanTranslationOffset(offset);
+        }
+    }
+
+    public void saveKeyboardPositionBeforeTransition() {
+
     }
 }

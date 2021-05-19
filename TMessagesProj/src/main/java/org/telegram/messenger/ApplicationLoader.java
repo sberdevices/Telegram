@@ -10,22 +10,22 @@ package org.telegram.messenger;
 
 import android.annotation.SuppressLint;
 import android.app.Activity;
-import android.app.AlarmManager;
 import android.app.Application;
-import android.app.PendingIntent;
 import android.content.BroadcastReceiver;
 import android.content.Context;
 import android.content.Intent;
 import android.content.IntentFilter;
-import android.content.SharedPreferences;
 import android.content.pm.ApplicationInfo;
 import android.content.res.Configuration;
 import android.net.ConnectivityManager;
 import android.net.NetworkInfo;
 import android.os.Handler;
 import android.os.PowerManager;
+import android.os.SystemClock;
 import android.telephony.TelephonyManager;
 import android.text.TextUtils;
+
+import androidx.multidex.MultiDex;
 
 import com.google.android.gms.common.ConnectionResult;
 import com.google.android.gms.common.GooglePlayServicesUtil;
@@ -37,9 +37,13 @@ import org.telegram.ui.Components.ForegroundDetector;
 
 import java.io.File;
 
-import androidx.multidex.MultiDex;
+import ru.sberdevices.sbdv.SbdvServiceLocator;
+import ru.sberdevices.sbdv.analytics.AnalyticsCollector;
+import ru.sberdevices.sbdv.model.AppEvent;
 
 public class ApplicationLoader extends Application {
+
+    private static final String TAG = "ApplicationLoader";
 
     @SuppressLint("StaticFieldLeak")
     public static volatile Context applicationContext;
@@ -49,10 +53,14 @@ public class ApplicationLoader extends Application {
     private static ConnectivityManager connectivityManager;
     private static volatile boolean applicationInited = false;
 
+    public static long startTime;
+
     public static volatile boolean isScreenOn = false;
     public static volatile boolean mainInterfacePaused = true;
+    public static volatile boolean mainInterfaceStopped = true;
     public static volatile boolean externalInterfacePaused = true;
     public static volatile boolean mainInterfacePausedStageQueue = true;
+    public static boolean canDrawOverlays;
     public static volatile long mainInterfacePausedStageQueueTime;
 
     public static boolean hasPlayServices;
@@ -85,10 +93,10 @@ public class ApplicationLoader extends Application {
         if (applicationInited) {
             return;
         }
-
         applicationInited = true;
 
         try {
+            // 700 - 1000 ms
             LocaleController.getInstance();
         } catch (Exception e) {
             e.printStackTrace();
@@ -138,7 +146,7 @@ public class ApplicationLoader extends Application {
         }
 
         SharedConfig.loadConfig();
-        for (int a = 0; a < UserConfig.MAX_ACCOUNT_COUNT; a++) {
+        for (int a = 0; a < UserConfig.MAX_ACCOUNT_COUNT; a++) { //TODO improve account
             UserConfig.getInstance(a).loadConfig();
             MessagesController.getInstance(a);
             if (a == 0) {
@@ -153,19 +161,21 @@ public class ApplicationLoader extends Application {
             }
         }
 
-        ApplicationLoader app = (ApplicationLoader) ApplicationLoader.applicationContext;
-        app.initPlayServices();
+        // PlayServices is not enabled in SberPortal. Minus 330 ms in startup
+        // ApplicationLoader app = (ApplicationLoader) ApplicationLoader.applicationContext;
+        // app.initPlayServices();
         if (BuildVars.LOGS_ENABLED) {
             FileLog.d("app initied");
         }
 
         MediaController.getInstance();
-        for (int a = 0; a < UserConfig.MAX_ACCOUNT_COUNT; a++) {
+        for (int a = 0; a < UserConfig.MAX_ACCOUNT_COUNT; a++) { //TODO improve account
             ContactsController.getInstance(a).checkAppAccount();
             DownloadController.getInstance(a);
         }
 
-        WearDataLayerListenerService.updateWatchConnectionState();
+        // Google Wear Services is not enabled in SberPortal. Minus 40 ms in startup
+        // WearDataLayerListenerService.updateWatchConnectionState();
     }
 
     public ApplicationLoader() {
@@ -182,6 +192,9 @@ public class ApplicationLoader extends Application {
 
         super.onCreate();
 
+        if (BuildVars.LOGS_ENABLED) {
+            FileLog.d("app start time = " + (startTime = SystemClock.elapsedRealtime()));
+        }
         if (applicationContext == null) {
             applicationContext = getApplicationContext();
         }
@@ -198,33 +211,24 @@ public class ApplicationLoader extends Application {
                 }
             }
         };
+        if (BuildVars.LOGS_ENABLED) {
+            FileLog.d("load libs time = " + (SystemClock.elapsedRealtime() - startTime));
+        }
 
         applicationHandler = new Handler(applicationContext.getMainLooper());
 
         AndroidUtilities.runOnUIThread(ApplicationLoader::startPushService);
+
+        SbdvServiceLocator.init(this);
+        SbdvServiceLocator.getAppStateRepository().setAuthStateProvider(() -> UserConfig.getInstance(UserConfig.selectedAccount).isClientActivated());
     }
 
     public static void startPushService() {
-        SharedPreferences preferences = MessagesController.getGlobalNotificationsSettings();
-        boolean enabled;
-        if (preferences.contains("pushService")) {
-            enabled = preferences.getBoolean("pushService", true);
-        } else {
-            enabled = MessagesController.getMainSettings(UserConfig.selectedAccount).getBoolean("keepAliveService", false);
-        }
-        if (enabled) {
-            try {
-                applicationContext.startService(new Intent(applicationContext, NotificationsService.class));
-            } catch (Throwable ignore) {
+        // We want to have a socket with the backend all the time.
+        ConnectionsManager.getInstance(UserConfig.selectedAccount).setAppPaused(false, false);
 
-            }
-        } else {
-            applicationContext.stopService(new Intent(applicationContext, NotificationsService.class));
-
-            PendingIntent pintent = PendingIntent.getService(applicationContext, 0, new Intent(applicationContext, NotificationsService.class), 0);
-            AlarmManager alarm = (AlarmManager)applicationContext.getSystemService(Context.ALARM_SERVICE);
-            alarm.cancel(pintent);
-        }
+        // A foreground sticky service is supposed to keep the application alive to receive incoming calls.
+        NotificationsService.startForeground(applicationContext);
     }
 
     @Override

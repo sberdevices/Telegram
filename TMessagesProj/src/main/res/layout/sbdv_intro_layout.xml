@@ -1,0 +1,91 @@
+<?xml version="1.0" encoding="utf-8"?>
+<ScrollView xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="@drawable/sbdv_background"
+    android:fillViewport="true">
+
+    <FrameLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content">
+
+        <androidx.constraintlayout.widget.ConstraintLayout
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_gravity="center_horizontal"
+            android:layout_marginTop="210dp"
+            android:paddingBottom="48dp"
+            android:background="@drawable/intro_frame_background">
+
+            <TextView
+                android:id="@+id/titleTextView"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginStart="50dp"
+                android:layout_marginTop="62dp"
+                android:layout_marginEnd="50dp"
+                android:text="@string/Videocalls"
+                android:textAppearance="@style/TextAppearance.Sbdv.Title"
+                android:textColor="@color/sbdv_white"
+                app:layout_constrainedWidth="true"
+                app:layout_constraintEnd_toEndOf="parent"
+                app:layout_constraintStart_toStartOf="parent"
+                app:layout_constraintTop_toTopOf="parent" />
+
+            <TextView
+                android:id="@+id/messageTextView"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_marginStart="48dp"
+                android:layout_marginTop="24dp"
+                android:layout_marginEnd="48dp"
+                android:gravity="center_horizontal"
+                android:text="@string/Page1Message"
+                android:textAlignment="gravity"
+                android:textAppearance="@style/TextAppearance.Sbdv.Caption"
+                android:textColor="@color/sbdv_white_56"
+                app:layout_constraintEnd_toEndOf="parent"
+                app:layout_constraintStart_toStartOf="parent"
+                app:layout_constraintTop_toBottomOf="@id/titleTextView" />
+
+            <TextView
+                android:id="@+id/startMessagingButton"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginStart="32dp"
+                android:layout_marginTop="48dp"
+                android:layout_marginEnd="32dp"
+                android:background="@drawable/sbdv_positive_btn_r24_background"
+                android:paddingStart="40dp"
+                android:paddingTop="24dp"
+                android:paddingEnd="40dp"
+                android:paddingBottom="24dp"
+                android:lines="1"
+                android:maxLines="1"
+                android:text="@string/AuthorizeInTelegram"
+                android:textAppearance="@style/TextAppearance.Sbdv.Button"
+                android:textColor="@color/sbdv_white"
+                android:foreground="@drawable/sbdv_selector_focusable_button_24"
+                app:layout_constrainedWidth="true"
+                app:layout_constraintEnd_toEndOf="parent"
+                app:layout_constraintStart_toStartOf="parent"
+                app:layout_constraintTop_toBottomOf="@id/messageTextView" />
+
+        </androidx.constraintlayout.widget.ConstraintLayout>
+
+        <TextView
+            android:id="@+id/telegramTextView"
+            android:gravity="center"
+            android:textAlignment="gravity"
+            android:layout_width="620dp"
+            android:layout_height="wrap_content"
+            android:layout_gravity="bottom|center_horizontal"
+            android:layout_marginBottom="136dp"
+            android:text="@string/IsNotAnOfficialClientOfTelegram"
+            android:textAppearance="@style/TextAppearance.Sbdv.Caption"
+            android:textColor="@color/sbdv_white_56" />
+
+    </FrameLayout>
+
+</ScrollView>

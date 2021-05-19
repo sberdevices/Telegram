@@ -226,9 +226,9 @@ public class DownloadController extends BaseController implements NotificationCe
     public DownloadController(int instance) {
         super(instance);
         SharedPreferences preferences = MessagesController.getMainSettings(currentAccount);
-        String defaultLow = "1_1_1_1_1048576_512000_512000_524288_0_0_1_1_50";
-        String defaultMedium = "13_13_13_13_1048576_10485760_1048576_524288_1_1_1_0_100";
-        String defaultHigh = "13_13_13_13_1048576_15728640_3145728_524288_1_1_1_0_100";
+        String defaultLow = "1_1_1_1_1048576_512000_512000_524288_0_0_0_1_50";
+        String defaultMedium = "13_13_13_13_1048576_10485760_1048576_524288_1_1_0_0_100";
+        String defaultHigh = "13_13_13_13_1048576_15728640_3145728_524288_1_1_0_0_100";
         lowPreset = new Preset(preferences.getString("preset0", defaultLow), defaultLow);
         mediumPreset = new Preset(preferences.getString("preset1", defaultMedium), defaultMedium);
         highPreset = new Preset(preferences.getString("preset2", defaultHigh), defaultHigh);
@@ -271,7 +271,8 @@ public class DownloadController extends BaseController implements NotificationCe
             roamingMaxFileSize[2] = preferences.getInt("roamingMaxDownloadSize" + 2, lowPreset.sizes[PRESET_SIZE_NUM_VIDEO]);
             roamingMaxFileSize[3] = preferences.getInt("roamingMaxDownloadSize" + 3, lowPreset.sizes[PRESET_SIZE_NUM_DOCUMENT]);
 
-            boolean globalAutodownloadEnabled = preferences.getBoolean("globalAutodownloadEnabled", true);
+            // Auto download disabled by default on SberDevices
+            boolean globalAutodownloadEnabled = preferences.getBoolean("globalAutodownloadEnabled", false);
             mobilePreset = new Preset(mobileDataDownloadMask, mediumPreset.sizes[PRESET_SIZE_NUM_PHOTO], mobileMaxFileSize[2], mobileMaxFileSize[3], true, true, globalAutodownloadEnabled, false, 100);
             wifiPreset = new Preset(wifiDownloadMask, highPreset.sizes[PRESET_SIZE_NUM_PHOTO], wifiMaxFileSize[2], wifiMaxFileSize[3], true, true, globalAutodownloadEnabled, false, 100);
             roamingPreset = new Preset(roamingDownloadMask, lowPreset.sizes[PRESET_SIZE_NUM_PHOTO], roamingMaxFileSize[2], roamingMaxFileSize[3], false, false, globalAutodownloadEnabled, true, 50);
@@ -614,7 +615,7 @@ public class DownloadController extends BaseController implements NotificationCe
             return 0;
         }
         int index;
-        TLRPC.Peer peer = message.to_id;
+        TLRPC.Peer peer = message.peer_id;
         if (peer != null) {
             if (peer.user_id != 0) {
                 if (getContactsController().contactsDict.containsKey(peer.user_id)) {
@@ -623,14 +624,15 @@ public class DownloadController extends BaseController implements NotificationCe
                     index = 1;
                 }
             } else if (peer.chat_id != 0) {
-                if (message.from_id != 0 && getContactsController().contactsDict.containsKey(message.from_id)) {
+                if (message.from_id instanceof TLRPC.TL_peerUser && getContactsController().contactsDict.containsKey(message.from_id.user_id)) {
                     index = 0;
                 } else {
                     index = 2;
                 }
             } else {
-                if (MessageObject.isMegagroup(message)) {
-                    if (message.from_id != 0 && getContactsController().contactsDict.containsKey(message.from_id)) {
+                TLRPC.Chat chat = message.peer_id != null && message.peer_id.channel_id != 0 ? getMessagesController().getChat(message.peer_id.channel_id) : null;
+                if (ChatObject.isChannel(chat) && chat.megagroup) {
+                    if (message.from_id instanceof TLRPC.TL_peerUser && getContactsController().contactsDict.containsKey(message.from_id.user_id)) {
                         index = 0;
                     } else {
                         index = 2;
@@ -768,12 +770,12 @@ public class DownloadController extends BaseController implements NotificationCe
             }
             if (downloadObject.object instanceof TLRPC.Document) {
                 TLRPC.Document document = (TLRPC.Document) downloadObject.object;
-                getFileLoader().cancelLoadFile(document);
+                getFileLoader().cancelLoadFile(document, true);
             } else if (downloadObject.object instanceof TLRPC.Photo) {
                 TLRPC.Photo photo = (TLRPC.Photo) downloadObject.object;
                 TLRPC.PhotoSize photoSize = FileLoader.getClosestPhotoSizeWithSize(photo.sizes, AndroidUtilities.getPhotoSize());
                 if (photoSize != null) {
-                    getFileLoader().cancelLoadFile(photoSize);
+                    getFileLoader().cancelLoadFile(photoSize, true);
                 }
             }
         }
@@ -783,14 +785,14 @@ public class DownloadController extends BaseController implements NotificationCe
         if (objects.isEmpty()) {
             return;
         }
-        ArrayList<DownloadObject> queue = null;
+        ArrayList<DownloadObject> queue;
         if (type == AUTODOWNLOAD_TYPE_PHOTO) {
             queue = photoDownloadQueue;
         } else if (type == AUTODOWNLOAD_TYPE_AUDIO) {
             queue = audioDownloadQueue;
         } else if (type == AUTODOWNLOAD_TYPE_VIDEO) {
             queue = videoDownloadQueue;
-        } else if (type == AUTODOWNLOAD_TYPE_DOCUMENT) {
+        } else {
             queue = documentDownloadQueue;
         }
         for (int a = 0; a < objects.size(); a++) {
@@ -1040,34 +1042,36 @@ public class DownloadController extends BaseController implements NotificationCe
                     for (int a = 0; a < delayedMessages.size(); a++) {
                         SendMessagesHelper.DelayedMessage delayedMessage = delayedMessages.get(a);
                         if (delayedMessage.encryptedChat == null) {
-                            long dialog_id = delayedMessage.peer;
+                            long dialogId = delayedMessage.peer;
+                            int topMessageId = delayedMessage.topMessageId;
+                            Long lastTime = typingTimes.get(dialogId);
                             if (delayedMessage.type == 4) {
-                                Long lastTime = typingTimes.get(dialog_id);
                                 if (lastTime == null || lastTime + 4000 < System.currentTimeMillis()) {
                                     MessageObject messageObject = (MessageObject) delayedMessage.extraHashMap.get(fileName + "_i");
                                     if (messageObject != null && messageObject.isVideo()) {
-                                        getMessagesController().sendTyping(dialog_id, 5, 0);
+                                        getMessagesController().sendTyping(dialogId, topMessageId, 5, 0);
+                                    } else if (messageObject != null && messageObject.getDocument() != null) {
+                                        getMessagesController().sendTyping(dialogId, topMessageId, 3, 0);
                                     } else {
-                                        getMessagesController().sendTyping(dialog_id, 4, 0);
+                                        getMessagesController().sendTyping(dialogId, topMessageId, 4, 0);
                                     }
-                                    typingTimes.put(dialog_id, System.currentTimeMillis());
+                                    typingTimes.put(dialogId, System.currentTimeMillis());
                                 }
                             } else {
-                                Long lastTime = typingTimes.get(dialog_id);
                                 TLRPC.Document document = delayedMessage.obj.getDocument();
                                 if (lastTime == null || lastTime + 4000 < System.currentTimeMillis()) {
                                     if (delayedMessage.obj.isRoundVideo()) {
-                                        getMessagesController().sendTyping(dialog_id, 8, 0);
+                                        getMessagesController().sendTyping(dialogId, topMessageId, 8, 0);
                                     } else if (delayedMessage.obj.isVideo()) {
-                                        getMessagesController().sendTyping(dialog_id, 5, 0);
+                                        getMessagesController().sendTyping(dialogId, topMessageId, 5, 0);
                                     } else if (delayedMessage.obj.isVoice()) {
-                                        getMessagesController().sendTyping(dialog_id, 9, 0);
+                                        getMessagesController().sendTyping(dialogId, topMessageId, 9, 0);
                                     } else if (delayedMessage.obj.getDocument() != null) {
-                                        getMessagesController().sendTyping(dialog_id, 3, 0);
+                                        getMessagesController().sendTyping(dialogId, topMessageId, 3, 0);
                                     } else if (delayedMessage.photoSize != null) {
-                                        getMessagesController().sendTyping(dialog_id, 4, 0);
+                                        getMessagesController().sendTyping(dialogId, topMessageId, 4, 0);
                                     }
-                                    typingTimes.put(dialog_id, System.currentTimeMillis());
+                                    typingTimes.put(dialogId, System.currentTimeMillis());
                                 }
                             }
                         }

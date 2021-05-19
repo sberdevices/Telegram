@@ -38,6 +38,7 @@ import com.google.android.exoplayer2.audio.TeeAudioProcessor;
 import com.google.android.exoplayer2.drm.DrmSessionManager;
 import com.google.android.exoplayer2.drm.FrameworkMediaCrypto;
 import com.google.android.exoplayer2.extractor.DefaultExtractorsFactory;
+import com.google.android.exoplayer2.mediacodec.MediaCodecRenderer;
 import com.google.android.exoplayer2.mediacodec.MediaCodecSelector;
 import com.google.android.exoplayer2.source.ExtractorMediaSource;
 import com.google.android.exoplayer2.source.LoopingMediaSource;
@@ -104,6 +105,8 @@ public class VideoPlayer implements ExoPlayer.EventListener, SimpleExoPlayer.Vid
     private boolean autoplay;
     private boolean mixedAudio;
 
+    private boolean triedReinit;
+
     private Uri currentUri;
 
     private boolean videoPlayerReady;
@@ -125,11 +128,17 @@ public class VideoPlayer implements ExoPlayer.EventListener, SimpleExoPlayer.Vid
     private boolean looping;
     private int repeatCount;
 
+    private boolean shouldPauseOther;
+
     Handler audioUpdateHandler = new Handler(Looper.getMainLooper());
 
     private static final DefaultBandwidthMeter BANDWIDTH_METER = new DefaultBandwidthMeter();
 
     public VideoPlayer() {
+        this(true);
+    }
+
+    public VideoPlayer(boolean pauseOther) {
         mediaDataSourceFactory = new ExtendedDefaultDataSourceFactory(ApplicationLoader.applicationContext, BANDWIDTH_METER, new DefaultHttpDataSourceFactory("Mozilla/5.0 (X11; Linux x86_64; rv:10.0) Gecko/20150101 Firefox/47.0 (Chrome)", BANDWIDTH_METER));
 
         mainHandler = new Handler();
@@ -138,7 +147,10 @@ public class VideoPlayer implements ExoPlayer.EventListener, SimpleExoPlayer.Vid
         trackSelector = new DefaultTrackSelector(videoTrackSelectionFactory);
 
         lastReportedPlaybackState = ExoPlayer.STATE_IDLE;
-        NotificationCenter.getGlobalInstance().addObserver(this, NotificationCenter.playerDidStartPlaying);
+        shouldPauseOther = pauseOther;
+        if (pauseOther) {
+            NotificationCenter.getGlobalInstance().addObserver(this, NotificationCenter.playerDidStartPlaying);
+        }
     }
 
     @Override
@@ -336,7 +348,9 @@ public class VideoPlayer implements ExoPlayer.EventListener, SimpleExoPlayer.Vid
             audioPlayer.release(async);
             audioPlayer = null;
         }
-        NotificationCenter.getGlobalInstance().removeObserver(this, NotificationCenter.playerDidStartPlaying);
+        if (shouldPauseOther) {
+            NotificationCenter.getGlobalInstance().removeObserver(this, NotificationCenter.playerDidStartPlaying);
+        }
     }
 
     @Override
@@ -569,7 +583,7 @@ public class VideoPlayer implements ExoPlayer.EventListener, SimpleExoPlayer.Vid
     @Override
     public void onPlayerStateChanged(boolean playWhenReady, int playbackState) {
         maybeReportPlayerState();
-        if (playWhenReady && playbackState == Player.STATE_READY && !isMuted()) {
+        if (playWhenReady && playbackState == Player.STATE_READY && !isMuted() && shouldPauseOther) {
             NotificationCenter.getGlobalInstance().postNotificationName(NotificationCenter.playerDidStartPlaying, this);
         }
         if (!videoPlayerReady && playbackState == Player.STATE_READY) {
@@ -609,13 +623,14 @@ public class VideoPlayer implements ExoPlayer.EventListener, SimpleExoPlayer.Vid
     @Override
     public void onPlayerError(ExoPlaybackException error) {
         Throwable cause = error.getCause();
-        if (textureView != null && cause instanceof SurfaceNotValidException) {
+        if (textureView != null && (!triedReinit && cause instanceof MediaCodecRenderer.DecoderInitializationException || cause instanceof SurfaceNotValidException)) {
+            triedReinit = true;
             if (player != null) {
                 ViewGroup parent = (ViewGroup) textureView.getParent();
                 if (parent != null) {
                     int i = parent.indexOfChild(textureView);
                     parent.removeView(textureView);
-                    parent.addView(textureView,i);
+                    parent.addView(textureView, i);
                 }
                 player.clearVideoTextureView(textureView);
                 player.setVideoTextureView(textureView);

@@ -1,0 +1,52 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    xmlns:tools="http://schemas.android.com/tools"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:gravity="center_horizontal"
+    android:orientation="vertical"
+    app:layout_constraintStart_toStartOf="parent"
+    app:layout_constraintTop_toBottomOf="@+id/tabButtons"
+    tools:background="@drawable/sbdv_background">
+
+    <FrameLayout
+        android:layout_width="244dp"
+        android:layout_height="244dp"
+        android:layout_marginTop="48dp"
+        android:background="@drawable/background_circles">
+
+        <ImageView
+            android:id="@+id/emptyContactsIcon"
+            android:layout_width="72dp"
+            android:layout_height="72dp"
+            android:layout_gravity="center"
+            android:importantForAccessibility="no"
+            android:src="@drawable/ic_user_on_user" />
+
+    </FrameLayout>
+
+    <TextView
+        android:id="@+id/emptyContactsMessageTitle"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="24dp"
+        android:fontFamily="@font/sb_sans_regular"
+        android:letterSpacing="-0.03"
+        android:textColor="@color/white"
+        android:textSize="36sp"
+        android:textStyle="bold"
+        tools:text="@string/sbdv_no_recent_calls" />
+
+    <TextView
+        android:id="@+id/emptyContactsMessage"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="24dp"
+        android:fontFamily="@font/sb_sans_regular"
+        android:letterSpacing="-0.03"
+        android:textColor="#88FFFFFF"
+        android:textSize="28sp"
+        tools:text="@string/sbdv_time_to_say_salute" />
+
+</LinearLayout>

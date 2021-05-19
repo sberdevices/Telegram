@@ -34,10 +34,12 @@ import android.hardware.SensorEvent;
 import android.hardware.SensorEventListener;
 import android.hardware.SensorManager;
 import android.media.AudioAttributes;
+import android.media.AudioFocusRequest;
 import android.media.AudioFormat;
 import android.media.AudioManager;
 import android.media.AudioTrack;
 import android.media.MediaPlayer;
+import android.media.MediaRouter;
 import android.media.RingtoneManager;
 import android.media.SoundPool;
 import android.net.ConnectivityManager;
@@ -58,13 +60,21 @@ import android.telephony.TelephonyManager;
 import android.text.SpannableString;
 import android.text.TextUtils;
 import android.text.style.ForegroundColorSpan;
+import android.util.Log;
 import android.view.View;
+import android.view.ViewGroup;
+import android.view.WindowManager;
 import android.widget.RemoteViews;
+import android.widget.TextView;
 
+import androidx.annotation.Nullable;
+
+import org.telegram.messenger.AccountInstance;
 import org.telegram.messenger.AndroidUtilities;
 import org.telegram.messenger.ApplicationLoader;
 import org.telegram.messenger.BuildConfig;
 import org.telegram.messenger.BuildVars;
+import org.telegram.messenger.ChatObject;
 import org.telegram.messenger.ContactsController;
 import org.telegram.messenger.FileLoader;
 import org.telegram.messenger.FileLog;
@@ -76,6 +86,9 @@ import org.telegram.messenger.NotificationsController;
 import org.telegram.messenger.R;
 import org.telegram.messenger.StatsController;
 import org.telegram.messenger.UserConfig;
+import org.telegram.messenger.UserObject;
+import org.telegram.messenger.Utilities;
+import org.telegram.messenger.Utilities;
 import org.telegram.tgnet.ConnectionsManager;
 import org.telegram.tgnet.TLObject;
 import org.telegram.tgnet.TLRPC;
@@ -90,6 +103,9 @@ import java.lang.reflect.Field;
 import java.lang.reflect.Method;
 import java.util.ArrayList;
 
+import ru.sberdevices.sbdv.overlay.OverlayManager;
+import ru.sberdevices.sbdv.view.AvatarView;
+
 /**
  * Created by grishka on 21.07.17.
  */
@@ -103,6 +119,7 @@ public abstract class VoIPBaseService extends Service implements SensorEventList
 	public static final int STATE_ESTABLISHED = Instance.STATE_ESTABLISHED;
 	public static final int STATE_FAILED = Instance.STATE_FAILED;
 	public static final int STATE_RECONNECTING = Instance.STATE_RECONNECTING;
+	public static final int STATE_CREATING = 6;
 	public static final int STATE_ENDED = 11;
 	public static final String ACTION_HEADSET_PLUG = "android.intent.action.HEADSET_PLUG";
 
@@ -120,12 +137,22 @@ public abstract class VoIPBaseService extends Service implements SensorEventList
 
 	protected static final boolean USE_CONNECTION_SERVICE = isDeviceCompatibleWithConnectionServiceAPI();
 
+	private final String TAG = "VoIPBaseService";
+	private final float LOSS_FOCUS_VOLUME_LEVEL = 0.1f;
+	private final float MAX_VOLUME_LEVEL = 1f;
+
 	protected static final int PROXIMITY_SCREEN_OFF_WAKE_LOCK = 32;
-	protected static VoIPBaseService sharedInstance;
+	protected static volatile VoIPBaseService sharedInstance;
+	protected static Runnable setModeRunnable;
+	protected static final Object sync = new Object();
 	protected NetworkInfo lastNetInfo;
 	protected int currentState = 0;
 	protected Notification ongoingCallNotification;
 	protected NativeInstance tgVoip;
+	protected boolean wasConnected;
+
+	protected TLRPC.Chat chat;
+
 	protected boolean isVideoAvailable;
 	protected boolean notificationsDisabled;
 	protected boolean switchingCamera;
@@ -142,20 +169,36 @@ public abstract class VoIPBaseService extends Service implements SensorEventList
 	protected int spRingbackID;
 	protected int spFailedID;
 	protected int spEndId;
+	protected int spVoiceChatEndId;
+	protected int spVoiceChatStartId;
+	protected int spVoiceChatConnecting;
 	protected int spBusyId;
 	protected int spConnectingId;
-	protected int spPlayID;
+	protected int spIncommingID;
+	protected volatile int spPlayID;
+	protected float currentVolume = MAX_VOLUME_LEVEL;
 	protected boolean needPlayEndSound;
-	protected boolean haveAudioFocus;
+	protected boolean hasAudioFocus;
 	protected boolean micMute;
+	protected boolean unmutedByHold;
 	protected BluetoothAdapter btAdapter;
 	protected Instance.TrafficStats prevTrafficStats;
 	protected boolean isBtHeadsetConnected;
 	protected boolean screenOn;
 
+	private Runnable updateNotificationRunnable;
+
+	protected Runnable onDestroyRunnable;
+
+	protected boolean playedConnectedSound;
+
 	protected int videoState = Instance.VIDEO_STATE_INACTIVE;
 
-	public TLRPC.PhoneCall call;
+	public TLRPC.PhoneCall privateCall;
+	public ChatObject.Call groupCall;
+
+	protected int mySource;
+	protected boolean createGroupCall;
 
 	protected long callStartTime;
 	protected boolean playingSound;
@@ -179,6 +222,8 @@ public abstract class VoIPBaseService extends Service implements SensorEventList
 	protected boolean didDeleteConnectionServiceContact;
 	protected Runnable connectingSoundRunnable;
 
+	protected OverlayManager overlayManager;
+
 	private String currentBluetoothDeviceName;
 
 	public final SharedUIParams sharedUIParams = new SharedUIParams();
@@ -186,17 +231,35 @@ public abstract class VoIPBaseService extends Service implements SensorEventList
 	protected Runnable afterSoundRunnable = new Runnable() {
 		@Override
 		public void run() {
-			soundPool.release();
-			if (USE_CONNECTION_SERVICE) {
-				return;
-			}
+
 			AudioManager am = (AudioManager) getSystemService(AUDIO_SERVICE);
-			if (isBtHeadsetConnected) {
-				am.stopBluetoothSco();
-				am.setBluetoothScoOn(false);
-				bluetoothScoActive = false;
+			am.abandonAudioFocus(VoIPBaseService.this);
+			am.unregisterMediaButtonEventReceiver(new ComponentName(VoIPBaseService.this, VoIPMediaButtonReceiver.class));
+			if (!USE_CONNECTION_SERVICE && sharedInstance == null) {
+				if (isBtHeadsetConnected) {
+					am.stopBluetoothSco();
+					am.setBluetoothScoOn(false);
+					bluetoothScoActive = false;
+				}
+				am.setSpeakerphoneOn(false);
 			}
-			am.setSpeakerphoneOn(false);
+
+			Utilities.globalQueue.postRunnable(() -> soundPool.release());
+			Utilities.globalQueue.postRunnable(setModeRunnable = () -> {
+				synchronized (sync) {
+					if (setModeRunnable == null) {
+						return;
+					}
+					setModeRunnable = null;
+				}
+				try {
+					am.setMode(AudioManager.MODE_NORMAL);
+				} catch (SecurityException x) {
+					if (BuildVars.LOGS_ENABLED) {
+						FileLog.e("Error setting audio more to normal", x);
+					}
+				}
+			});
 		}
 	};
 
@@ -342,6 +405,9 @@ public abstract class VoIPBaseService extends Service implements SensorEventList
 	}
 
 	public void registerStateListener(StateListener l) {
+		if (stateListeners.contains(l)) {
+			return;
+		}
 		stateListeners.add(l);
 		if (currentState != 0) {
 			l.onStateChanged(currentState);
@@ -355,20 +421,70 @@ public abstract class VoIPBaseService extends Service implements SensorEventList
 		stateListeners.remove(l);
 	}
 
-	public void setMicMute(boolean mute) {
+	public void setMicMute(boolean mute, boolean hold, boolean send) {
+		if (micMute == mute) {
+			return;
+		}
 		micMute = mute;
+		if (groupCall != null) {
+			if (!send) {
+				TLRPC.TL_groupCallParticipant self = groupCall.participants.get(UserConfig.getInstance(currentAccount).getClientUserId());
+				if (self != null && self.muted && !self.can_self_unmute) {
+					send = true;
+				}
+			}
+			if (send) {
+				editCallMember(UserConfig.getInstance(currentAccount).getCurrentUser(), mute);
+				Utilities.globalQueue.postRunnable(updateNotificationRunnable = () -> {
+					if (updateNotificationRunnable == null) {
+						return;
+					}
+					updateNotificationRunnable = null;
+					showNotification(chat.title, getRoundAvatarBitmap(chat));
+				});
+			}
+		}
+		unmutedByHold = !micMute && hold;
 		if (tgVoip != null) {
 			tgVoip.setMuteMicrophone(mute);
 		}
+		for (StateListener l : stateListeners) {
+			l.onAudioSettingsChanged();
+		}
+	}
+
+	public void editCallMember(TLObject object, boolean mute) {
+		if (groupCall == null) {
+			return;
+		}
+		TLRPC.TL_phone_editGroupCallMember req = new TLRPC.TL_phone_editGroupCallMember();
+		req.call = groupCall.getInputGroupCall();
+		if (object instanceof TLRPC.User) {
+			TLRPC.User user = (TLRPC.User) object;
+			if (UserObject.isUserSelf(user)) {
+				req.user_id = new TLRPC.TL_inputUserSelf();
+			} else {
+				req.user_id = new TLRPC.TL_inputUser();
+				req.user_id.user_id = user.id;
+				req.user_id.access_hash = user.access_hash;
+			}
+		}
+		req.muted = mute;
+		int account = currentAccount;
+		AccountInstance.getInstance(account).getConnectionsManager().sendRequest(req, (response, error) -> {
+			if (response != null) {
+				AccountInstance.getInstance(account).getMessagesController().processUpdates((TLRPC.Updates) response, false);
+			}
+		});
 	}
 
 	public boolean isMicMute() {
 		return micMute;
 	}
 
-	public void toggleSpeakerphoneOrShowRouteSheet(Activity activity) {
+	public void toggleSpeakerphoneOrShowRouteSheet(Context context, boolean fromOverlayWindow) {
 		if (isBluetoothHeadsetConnected() && hasEarpiece()) {
-			BottomSheet.Builder builder = new BottomSheet.Builder(activity)
+			BottomSheet.Builder builder = new BottomSheet.Builder(context)
 					.setTitle(LocaleController.getString("VoipOutputDevices", R.string.VoipOutputDevices), true)
 					.setItems(new CharSequence[]{
 									LocaleController.getString("VoipAudioRoutingSpeaker", R.string.VoipAudioRoutingSpeaker),
@@ -382,6 +498,15 @@ public abstract class VoIPBaseService extends Service implements SensorEventList
 								}
 								setAudioOutput(which);
 							});
+
+			BottomSheet bottomSheet = builder.create();
+			if (fromOverlayWindow) {
+				if (Build.VERSION.SDK_INT >= 26) {
+					bottomSheet.getWindow().setType(WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY);
+				} else {
+					bottomSheet.getWindow().setType(WindowManager.LayoutParams.TYPE_SYSTEM_ALERT);
+				}
+			}
 			builder.show();
 			return;
 		}
@@ -542,16 +667,23 @@ public abstract class VoIPBaseService extends Service implements SensorEventList
 	}
 
 	protected void showNotification(String name, Bitmap photo) {
-		Intent intent = new Intent(this, LaunchActivity.class).setAction("voip");
+		Intent intent = new Intent(this, LaunchActivity.class).setAction(groupCall != null ? "voip_chat" : "voip");
+		if (groupCall != null) {
+			intent.putExtra("currentAccount", currentAccount);
+		}
 		Notification.Builder builder = new Notification.Builder(this)
-				.setContentTitle(LocaleController.getString("VoipOutgoingCall", R.string.VoipOutgoingCall))
+				.setContentTitle(groupCall != null ? LocaleController.getString("VoipVoiceChat", R.string.VoipVoiceChat) : LocaleController.getString("VoipOutgoingCall", R.string.VoipOutgoingCall))
 				.setContentText(name)
-				.setSmallIcon(R.drawable.notification)
-				.setContentIntent(PendingIntent.getActivity(this, 0, intent, 0));
+				.setContentIntent(PendingIntent.getActivity(this, 50, intent, 0));
+		if (groupCall != null) {
+			builder.setSmallIcon(isMicMute() ? R.drawable.voicechat_muted : R.drawable.voicechat_active);
+		} else {
+			builder.setSmallIcon(R.drawable.notification);
+		}
 		if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.JELLY_BEAN) {
 			Intent endIntent = new Intent(this, VoIPActionsReceiver.class);
 			endIntent.setAction(getPackageName() + ".END_CALL");
-			builder.addAction(R.drawable.ic_call_end_white_24dp, LocaleController.getString("VoipEndCall", R.string.VoipEndCall), PendingIntent.getBroadcast(this, 0, endIntent, PendingIntent.FLAG_UPDATE_CURRENT));
+			builder.addAction(R.drawable.ic_call_end_white_24dp, groupCall != null ? LocaleController.getString("VoipGroupLeaveAlertTitle", R.string.VoipGroupLeaveAlertTitle) : LocaleController.getString("VoipEndCall", R.string.VoipEndCall), PendingIntent.getBroadcast(this, 0, endIntent, PendingIntent.FLAG_UPDATE_CURRENT));
 			builder.setPriority(Notification.PRIORITY_MAX);
 		}
 		if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.JELLY_BEAN_MR1) {
@@ -586,9 +718,9 @@ public abstract class VoIPBaseService extends Service implements SensorEventList
 				ringtonePlayer.setAudioStreamType(AudioManager.STREAM_VOICE_CALL);
 			} else {
 				ringtonePlayer.setAudioStreamType(AudioManager.STREAM_RING);
-				if (!USE_CONNECTION_SERVICE) {
-					am.requestAudioFocus(this, AudioManager.STREAM_RING, AudioManager.AUDIOFOCUS_GAIN);
-				}
+				// if (!USE_CONNECTION_SERVICE) {
+				// 	am.requestAudioFocus(this, AudioManager.STREAM_RING, AudioManager.AUDIOFOCUS_GAIN);
+				// }
 			}
 			try {
 				String notificationUri;
@@ -627,9 +759,11 @@ public abstract class VoIPBaseService extends Service implements SensorEventList
 
 	@Override
 	public void onDestroy() {
+		Log.d(TAG, "onDestroy()");
 		if (BuildVars.LOGS_ENABLED) {
 			FileLog.d("=============== VoIPService STOPPING ===============");
 		}
+		overlayManager.removeOverlay();
 		stopForeground(true);
 		stopRinging();
 		if (ApplicationLoader.mainInterfacePaused || !ApplicationLoader.isScreenOn) {
@@ -644,6 +778,10 @@ public abstract class VoIPBaseService extends Service implements SensorEventList
 		if (proximityWakelock != null && proximityWakelock.isHeld()) {
 			proximityWakelock.release();
 		}
+		if (updateNotificationRunnable != null) {
+			Utilities.globalQueue.cancelRunnable(updateNotificationRunnable);
+			updateNotificationRunnable = null;
+		}
 		unregisterReceiver(receiver);
 		if (timeoutRunnable != null) {
 			AndroidUtilities.cancelRunOnUIThread(timeoutRunnable);
@@ -655,9 +793,14 @@ public abstract class VoIPBaseService extends Service implements SensorEventList
 		if (tgVoip != null) {
 			StatsController.getInstance(currentAccount).incrementTotalCallsTime(getStatsNetworkType(), (int) (getCallDuration() / 1000) % 5);
 			onTgVoipPreStop();
-			Instance.FinalState state = tgVoip.stop();
-			updateTrafficStats(state.trafficStats);
-			onTgVoipStop(state);
+			if (tgVoip.isGroup()) {
+				NativeInstance instance = tgVoip;
+				Utilities.globalQueue.postRunnable(instance::stopGroup);
+			} else {
+				Instance.FinalState state = tgVoip.stop();
+				updateTrafficStats(state.trafficStats);
+				onTgVoipStop(state);
+			}
 			prevTrafficStats = null;
 			callStartTime = 0;
 			tgVoip = null;
@@ -668,30 +811,39 @@ public abstract class VoIPBaseService extends Service implements SensorEventList
 			videoCapturer = 0;
 		}
 		cpuWakelock.release();
-		AudioManager am = (AudioManager) getSystemService(AUDIO_SERVICE);
-		if (!USE_CONNECTION_SERVICE) {
-			if (isBtHeadsetConnected && !playingSound) {
-				am.stopBluetoothSco();
-				am.setBluetoothScoOn(false);
-				am.setSpeakerphoneOn(false);
-				bluetoothScoActive = false;
-			}
-			try {
-				am.setMode(AudioManager.MODE_NORMAL);
-			} catch (SecurityException x) {
-				if (BuildVars.LOGS_ENABLED) {
-					FileLog.e("Error setting audio more to normal", x);
-				}
-			}
-			am.abandonAudioFocus(this);
-		}
-		am.unregisterMediaButtonEventReceiver(new ComponentName(this, VoIPMediaButtonReceiver.class));
-		if (haveAudioFocus) {
-			am.abandonAudioFocus(this);
-		}
-
 		if (!playingSound) {
-			soundPool.release();
+			AudioManager am = (AudioManager) getSystemService(AUDIO_SERVICE);
+			if (!USE_CONNECTION_SERVICE) {
+				if (isBtHeadsetConnected) {
+					am.stopBluetoothSco();
+					am.setBluetoothScoOn(false);
+					am.setSpeakerphoneOn(false);
+					bluetoothScoActive = false;
+				}
+				if (onDestroyRunnable == null) {
+					Utilities.globalQueue.postRunnable(setModeRunnable = () -> {
+						synchronized (sync) {
+							if (setModeRunnable == null) {
+								return;
+							}
+							setModeRunnable = null;
+						}
+						try {
+							am.setMode(AudioManager.MODE_NORMAL);
+						} catch (SecurityException x) {
+							if (BuildVars.LOGS_ENABLED) {
+								FileLog.e("Error setting audio more to normal", x);
+							}
+						}
+					});
+				}
+				am.abandonAudioFocus(this);
+			}
+			am.unregisterMediaButtonEventReceiver(new ComponentName(this, VoIPMediaButtonReceiver.class));
+			if (hasAudioFocus) {
+				am.abandonAudioFocus(this);
+			}
+			Utilities.globalQueue.postRunnable(() -> soundPool.release());
 		}
 
 		if (USE_CONNECTION_SERVICE) {
@@ -704,7 +856,7 @@ public abstract class VoIPBaseService extends Service implements SensorEventList
 		}
 
 		ConnectionsManager.getInstance(currentAccount).setAppPaused(true, false);
-		VoIPHelper.lastCallTime = System.currentTimeMillis();
+		VoIPHelper.lastCallTime = SystemClock.elapsedRealtime();
 	}
 
 	public abstract long getCallID();
@@ -741,6 +893,7 @@ public abstract class VoIPBaseService extends Service implements SensorEventList
 		if (BuildVars.LOGS_ENABLED) {
 			FileLog.d("=============== VoIPService STARTING ===============");
 		}
+		overlayManager = new OverlayManager(this.getApplication());
 		try {
 			AudioManager am = (AudioManager) getSystemService(AUDIO_SERVICE);
 			if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.JELLY_BEAN_MR1 && am.getProperty(AudioManager.PROPERTY_OUTPUT_FRAMES_PER_BUFFER) != null) {
@@ -769,20 +922,51 @@ public abstract class VoIPBaseService extends Service implements SensorEventList
 			}
 			registerReceiver(receiver, filter);
 			fetchBluetoothDeviceName();
-			soundPool = new SoundPool(1, AudioManager.STREAM_VOICE_CALL, 0);
-			spConnectingId = soundPool.load(this, R.raw.voip_connecting, 1);
-			spRingbackID = soundPool.load(this, R.raw.voip_ringback, 1);
-			spFailedID = soundPool.load(this, R.raw.voip_failed, 1);
-			spEndId = soundPool.load(this, R.raw.voip_end, 1);
-			spBusyId = soundPool.load(this, R.raw.voip_busy, 1);
+			Utilities.globalQueue.postRunnable(() -> {
+				soundPool = new SoundPool(1, AudioManager.STREAM_VOICE_CALL, 0);
+				spIncommingID = soundPool.load(this, R.raw.call_incoming, 1);
+				spConnectingId = soundPool.load(this, R.raw.voip_connecting, 1);
+				spRingbackID = soundPool.load(this, R.raw.voip_ringback, 1);
+				spFailedID = soundPool.load(this, R.raw.voip_failed, 1);
+				spEndId = soundPool.load(this, R.raw.voip_end, 1);
+				spBusyId = soundPool.load(this, R.raw.voip_busy, 1);
+				spVoiceChatEndId = soundPool.load(this, R.raw.voicechat_leave, 1);
+				spVoiceChatStartId = soundPool.load(this, R.raw.voicechat_join, 1);
+				spVoiceChatConnecting = soundPool.load(this, R.raw.voicechat_connecting, 1);
+			});
 
 			am.registerMediaButtonEventReceiver(new ComponentName(this, VoIPMediaButtonReceiver.class));
 
+			AudioFocusRequest request = new AudioFocusRequest.Builder(AudioManager.AUDIOFOCUS_GAIN)
+					.setAcceptsDelayedFocusGain(true)
+					.setWillPauseWhenDucked(true)
+					.setOnAudioFocusChangeListener(this)
+					.build();
+			am.requestAudioFocus(request);
+
 			if (!USE_CONNECTION_SERVICE && btAdapter != null && btAdapter.isEnabled()) {
-				int headsetState = btAdapter.getProfileConnectionState(BluetoothProfile.HEADSET);
-				updateBluetoothHeadsetState(headsetState == BluetoothProfile.STATE_CONNECTED);
-				for (StateListener l : stateListeners) {
-					l.onAudioSettingsChanged();
+				try {
+					MediaRouter mr = (MediaRouter) getSystemService(Context.MEDIA_ROUTER_SERVICE);
+					if (Build.VERSION.SDK_INT < 24) {
+						int headsetState = btAdapter.getProfileConnectionState(BluetoothProfile.HEADSET);
+						updateBluetoothHeadsetState(headsetState == BluetoothProfile.STATE_CONNECTED);
+						for (StateListener l : stateListeners) {
+							l.onAudioSettingsChanged();
+						}
+					} else {
+						MediaRouter.RouteInfo ri = mr.getSelectedRoute(MediaRouter.ROUTE_TYPE_LIVE_AUDIO);
+						if (ri.getDeviceType() == MediaRouter.RouteInfo.DEVICE_TYPE_BLUETOOTH) {
+							int headsetState = btAdapter.getProfileConnectionState(BluetoothProfile.HEADSET);
+							updateBluetoothHeadsetState(headsetState == BluetoothProfile.STATE_CONNECTED);
+							for (StateListener l : stateListeners) {
+								l.onAudioSettingsChanged();
+							}
+						} else {
+							updateBluetoothHeadsetState(false);
+						}
+					}
+				} catch (Throwable e) {
+					FileLog.e(e);
 				}
 			}
 		} catch (Exception x) {
@@ -794,9 +978,14 @@ public abstract class VoIPBaseService extends Service implements SensorEventList
 	}
 
 	protected void dispatchStateChanged(int state) {
+		// filter changes to the same state
+		// we won't trigger repeating in listener's callback (it creates fake events in sbdv analytics)
+		if (currentState == state) return;
+
 		if (BuildVars.LOGS_ENABLED) {
 			FileLog.d("== Call " + getCallID() + " state changed to " + state + " ==");
 		}
+		Log.d(TAG, "== Call " + getCallID() + " state changed to " + state + " ==");
 		currentState = state;
 		if (USE_CONNECTION_SERVICE && state == STATE_ESTABLISHED /*&& !wasEstablished*/ && systemCallConnection != null) {
 			systemCallConnection.setActive();
@@ -835,8 +1024,13 @@ public abstract class VoIPBaseService extends Service implements SensorEventList
 		needPlayEndSound = true;
 		AudioManager am = (AudioManager) getSystemService(AUDIO_SERVICE);
 		if (!USE_CONNECTION_SERVICE) {
-			am.setMode(AudioManager.MODE_IN_COMMUNICATION);
-			am.requestAudioFocus(this, AudioManager.STREAM_VOICE_CALL, AudioManager.AUDIOFOCUS_GAIN);
+			Utilities.globalQueue.postRunnable(() -> {
+				try {
+					am.setMode(AudioManager.MODE_IN_COMMUNICATION);
+				} catch (Exception e) {
+					FileLog.e(e);
+				}
+			});
 			if (isBluetoothHeadsetConnected() && hasEarpiece()) {
 				switch (audioRouteToSet) {
 					case AUDIO_ROUTE_BLUETOOTH:
@@ -900,7 +1094,7 @@ public abstract class VoIPBaseService extends Service implements SensorEventList
 	@SuppressLint("NewApi")
 	@Override
 	public void onSensorChanged(SensorEvent event) {
-		if (currentVideoState == Instance.VIDEO_STATE_ACTIVE || videoState == Instance.VIDEO_STATE_ACTIVE) {
+		if (unmutedByHold || currentVideoState == Instance.VIDEO_STATE_ACTIVE || videoState == Instance.VIDEO_STATE_ACTIVE) {
 			return;
 		}
 		if (event.sensor.getType() == Sensor.TYPE_PROXIMITY) {
@@ -950,10 +1144,24 @@ public abstract class VoIPBaseService extends Service implements SensorEventList
 	}
 
 	public void onAudioFocusChange(int focusChange) {
+		Log.d(TAG, "onAudioFocusChange("+focusChange+")");
 		if (focusChange == AudioManager.AUDIOFOCUS_GAIN) {
-			haveAudioFocus = true;
+			hasAudioFocus = true;
 		} else {
-			haveAudioFocus = false;
+			hasAudioFocus = false;
+		}
+
+		if (spPlayID != 0) {
+			if (focusChange == AudioManager.AUDIOFOCUS_LOSS_TRANSIENT_CAN_DUCK ||
+					focusChange == AudioManager.AUDIOFOCUS_LOSS_TRANSIENT ||
+					focusChange == AudioManager.AUDIOFOCUS_LOSS) {
+				Log.d(TAG, "decrease volume...");
+				currentVolume = LOSS_FOCUS_VOLUME_LEVEL;
+			} else {
+				Log.d(TAG, "increase volume...");
+				currentVolume = MAX_VOLUME_LEVEL;
+			}
+			soundPool.setVolume(spPlayID, currentVolume, currentVolume);
 		}
 	}
 
@@ -1005,7 +1213,11 @@ public abstract class VoIPBaseService extends Service implements SensorEventList
 
 	protected void updateNetworkType() {
 		if (tgVoip != null) {
-			tgVoip.setNetworkType(getNetworkType());
+			if (tgVoip.isGroup()) {
+
+			} else {
+				tgVoip.setNetworkType(getNetworkType());
+			}
 		} else {
 			lastNetInfo = getActiveNetworkInfo();
 		}
@@ -1162,6 +1374,7 @@ public abstract class VoIPBaseService extends Service implements SensorEventList
 				chan.setSound(soundProviderUri, attrs);
 				chan.enableVibration(false);
 				chan.enableLights(false);
+				chan.setBypassDnd(true);
 				try {
 					nm.createNotificationChannel(chan);
 				} catch (Exception e) {
@@ -1211,6 +1424,7 @@ public abstract class VoIPBaseService extends Service implements SensorEventList
 			}
 		}
 		Notification incomingNotification = builder.getNotification();
+		Bitmap avatar = getRoundAvatarBitmap(userOrChat);
 		if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
 			RemoteViews customView = new RemoteViews(getPackageName(), LocaleController.isRTL ? R.layout.call_notification_rtl : R.layout.call_notification);
 			customView.setTextViewText(R.id.name, name);
@@ -1232,7 +1446,6 @@ public abstract class VoIPBaseService extends Service implements SensorEventList
 				}
 				customView.setTextViewText(R.id.title, subText);
 			}
-			Bitmap avatar = getRoundAvatarBitmap(userOrChat);
 			customView.setTextViewText(R.id.answer_text, LocaleController.getString("VoipAnswerCall", R.string.VoipAnswerCall));
 			customView.setTextViewText(R.id.decline_text, LocaleController.getString("VoipDeclineCall", R.string.VoipDeclineCall));
 			customView.setImageViewBitmap(R.id.photo, avatar);
@@ -1243,19 +1456,73 @@ public abstract class VoIPBaseService extends Service implements SensorEventList
 			incomingNotification.headsUpContentView = incomingNotification.bigContentView = customView;
 		}
 		startForeground(ID_INCOMING_CALL_NOTIFICATION, incomingNotification);
+		showSbdvIncomingCallNotiifcation(userOrChat, answerPendingIntent, endPendingIntent);
+	}
+
+	private static @Nullable PendingIntent acceptIntent;
+	private static @Nullable PendingIntent declineIntent;
+
+	private void showSbdvIncomingCallNotiifcation(TLObject userOrChat, PendingIntent accept, PendingIntent decline) {
+		ViewGroup viewGroup = (ViewGroup) View.inflate(this, R.layout.sbdv_notification, null);
+		if (userOrChat instanceof TLRPC.User) {
+			TLRPC.User user = (TLRPC.User) userOrChat;
+			((AvatarView) viewGroup.findViewById(R.id.photoView)).setUser(user);
+			String name = ContactsController.formatName(user.first_name, user.last_name);
+			((TextView) viewGroup.findViewById(R.id.nameView)).setText(name);
+		}
+		acceptIntent = accept;
+		declineIntent = decline;
+		viewGroup.findViewById(R.id.vcAccept).setOnClickListener(view -> acceptCall());
+		viewGroup.findViewById(R.id.vcDecline).setOnClickListener(view -> declineCall());
+
+		viewGroup.findViewById(R.id.vcEndCall).setVisibility(View.INVISIBLE);
+
+		overlayManager.replaceOverlay(viewGroup);
+	}
+
+	public void acceptCall() {
+		try {
+			if (acceptIntent != null) {
+				acceptIntent.send();
+			}
+		} catch (PendingIntent.CanceledException e) {
+			e.printStackTrace();
+		} finally {
+			acceptIntent = null;
+		}
+	}
+
+	public void declineCall() {
+		try {
+			if (declineIntent != null) {
+				declineIntent.send();
+			}
+		} catch (PendingIntent.CanceledException e) {
+			e.printStackTrace();
+		} finally {
+			declineIntent = null;
+		}
+	}
+
+	public void endCall() {
+		Intent endIntent = new Intent(this, VoIPActionsReceiver.class);
+		endIntent.setAction(getPackageName() + ".END_CALL");
+		sendBroadcast(endIntent);
 	}
 
 	protected void callFailed(String error) {
+		acceptIntent = null;
+		declineIntent = null;
 		try {
 			throw new Exception("Call " + getCallID() + " failed with error: " + error);
 		} catch (Exception x) {
 			FileLog.e(x);
 		}
 		lastError = error;
-		dispatchStateChanged(STATE_FAILED);
+		AndroidUtilities.runOnUIThread(() -> dispatchStateChanged(STATE_FAILED));
 		if (TextUtils.equals(error, Instance.ERROR_LOCALIZED) && soundPool != null) {
 			playingSound = true;
-			soundPool.play(spFailedID, 1, 1, 0, 0, 1);
+			Utilities.globalQueue.postRunnable(() -> soundPool.play(spFailedID, currentVolume, currentVolume, 0, 0, 1));
 			AndroidUtilities.runOnUIThread(afterSoundRunnable, 1000);
 		}
 		if (USE_CONNECTION_SERVICE && systemCallConnection != null) {
@@ -1285,13 +1552,15 @@ public abstract class VoIPBaseService extends Service implements SensorEventList
 				AndroidUtilities.cancelRunOnUIThread(connectingSoundRunnable);
 				connectingSoundRunnable = null;
 			}
-			if (spPlayID != 0) {
-				soundPool.stop(spPlayID);
-				spPlayID = 0;
-			}
-			if (!wasEstablished) {
+			Utilities.globalQueue.postRunnable(() -> {
+				if (spPlayID != 0) {
+					soundPool.stop(spPlayID);
+					spPlayID = 0;
+				}
+			});
+			if (groupCall == null && !wasEstablished) {
 				wasEstablished = true;
-				if (!isProximityNear && !call.video) {
+				if (!isProximityNear && !privateCall.video) {
 					Vibrator vibrator = (Vibrator) getSystemService(VIBRATOR_SERVICE);
 					if (vibrator.hasVibrator()) {
 						vibrator.vibrate(100);
@@ -1314,26 +1583,34 @@ public abstract class VoIPBaseService extends Service implements SensorEventList
 			}
 		}
 		if (newState == STATE_RECONNECTING) {
-			if (spPlayID != 0) {
-				soundPool.stop(spPlayID);
-			}
-			spPlayID = soundPool.play(spConnectingId, 1, 1, 0, -1, 1);
+			Utilities.globalQueue.postRunnable(() -> {
+				if (spPlayID != 0) {
+					soundPool.stop(spPlayID);
+				}
+				spPlayID = soundPool.play(groupCall != null ? spVoiceChatConnecting : spConnectingId, currentVolume, currentVolume, 0, -1, 1);
+			});
 		}
 		dispatchStateChanged(newState);
 	}
 
 	@Override
 	public void onSignalBarCountChanged(int newCount) {
-		signalBarCount = newCount;
-		for (int a = 0; a < stateListeners.size(); a++) {
-			StateListener l = stateListeners.get(a);
-			l.onSignalBarsCountChanged(newCount);
-		}
+		AndroidUtilities.runOnUIThread(() -> {
+			signalBarCount = newCount;
+			for (int a = 0; a < stateListeners.size(); a++) {
+				StateListener l = stateListeners.get(a);
+				l.onSignalBarsCountChanged(newCount);
+			}
+		});
 	}
 
 	public boolean isBluetoothOn() {
 		final AudioManager am = (AudioManager) getSystemService(AUDIO_SERVICE);
 		return am.isBluetoothScoOn();
+	}
+
+	public boolean isBluetoothWillOn() {
+		return needSwitchToBluetoothAfterScoActivates;
 	}
 
 	public boolean isHeadsetPlugged() {
@@ -1354,20 +1631,43 @@ public abstract class VoIPBaseService extends Service implements SensorEventList
 	}
 
 	protected void callEnded() {
+		Log.d(TAG, "callEnded()");
+		acceptIntent = null;
+		declineIntent = null;
 		if (BuildVars.LOGS_ENABLED) {
 			FileLog.d("Call " + getCallID() + " ended");
 		}
-		dispatchStateChanged(STATE_ENDED);
+		if (groupCall != null && (!playedConnectedSound || onDestroyRunnable != null)) {
+			needPlayEndSound = false;
+		}
+		AndroidUtilities.runOnUIThread(() -> dispatchStateChanged(STATE_ENDED));
+		int delay = 700;
+		Utilities.globalQueue.postRunnable(() -> {
+			if (spPlayID != 0) {
+				soundPool.stop(spPlayID);
+				spPlayID = 0;
+			}
+		});
+
+		if (connectingSoundRunnable != null) {
+			AndroidUtilities.cancelRunOnUIThread(connectingSoundRunnable);
+			connectingSoundRunnable = null;
+		}
 		if (needPlayEndSound) {
 			playingSound = true;
-			soundPool.play(spEndId, 1, 1, 0, 0, 1);
-			AndroidUtilities.runOnUIThread(afterSoundRunnable, 700);
+			if (groupCall == null) {
+				Utilities.globalQueue.postRunnable(() -> soundPool.play(spEndId, currentVolume, currentVolume, 0, 0, 1));
+			} else {
+				Utilities.globalQueue.postRunnable(() -> soundPool.play(spVoiceChatEndId, currentVolume, currentVolume, 0, 0, 1));
+				delay = 400;
+			}
+			AndroidUtilities.runOnUIThread(afterSoundRunnable, delay);
 		}
 		if (timeoutRunnable != null) {
 			AndroidUtilities.cancelRunOnUIThread(timeoutRunnable);
 			timeoutRunnable = null;
 		}
-		endConnectionServiceCall(needPlayEndSound ? 700 : 0);
+		endConnectionServiceCall(needPlayEndSound ? delay : 0);
 		stopSelf();
 	}
 
@@ -1422,7 +1722,7 @@ public abstract class VoIPBaseService extends Service implements SensorEventList
 
 	private void acceptIncomingCallFromNotification() {
 		showNotification();
-		if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M && (checkSelfPermission(Manifest.permission.RECORD_AUDIO) != PackageManager.PERMISSION_GRANTED || call.video && checkSelfPermission(Manifest.permission.CAMERA) != PackageManager.PERMISSION_GRANTED)) {
+		if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M && (checkSelfPermission(Manifest.permission.RECORD_AUDIO) != PackageManager.PERMISSION_GRANTED || privateCall.video && checkSelfPermission(Manifest.permission.CAMERA) != PackageManager.PERMISSION_GRANTED)) {
 			try {
 				PendingIntent.getActivity(VoIPBaseService.this, 0, new Intent(VoIPBaseService.this, VoIPPermissionActivity.class).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK), 0).send();
 			} catch (Exception x) {
@@ -1523,13 +1823,33 @@ public abstract class VoIPBaseService extends Service implements SensorEventList
 	}
 
 	public interface StateListener {
-		void onStateChanged(int state);
-		void onSignalBarsCountChanged(int count);
-		void onAudioSettingsChanged();
-		void onMediaStateUpdated(int audioState, int videoState);
-		void onCameraSwitch(boolean isFrontFace);
-		void onVideoAvailableChange(boolean isAvailable);
-		void onScreenOnChange(boolean screenOn);
+		default void onStateChanged(int state) {
+
+		}
+
+		default void onSignalBarsCountChanged(int count) {
+
+		}
+
+		default void onAudioSettingsChanged() {
+
+		}
+
+		default void onMediaStateUpdated(int audioState, int videoState) {
+
+		}
+
+		default void onCameraSwitch(boolean isFrontFace) {
+
+		}
+
+		default void onVideoAvailableChange(boolean isAvailable) {
+
+		}
+
+		default void onScreenOnChange(boolean screenOn) {
+
+		}
 	}
 
 	public class CallConnection extends Connection {

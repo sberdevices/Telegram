@@ -33,11 +33,10 @@ public class VoIPWindowView extends FrameLayout {
     public VoIPWindowView(Activity activity, boolean enterAnimation) {
         super(activity);
         this.activity = activity;
-        setSystemUiVisibility(View.SYSTEM_UI_FLAG_LAYOUT_STABLE | View.SYSTEM_UI_FLAG_LAYOUT_FULLSCREEN | View.SYSTEM_UI_FLAG_LAYOUT_HIDE_NAVIGATION);
+        setSystemUiVisibility(View.SYSTEM_UI_FLAG_LAYOUT_STABLE);
         setFitsSystemWindows(true);
 
         orientationBefore = activity.getRequestedOrientation();
-        activity.setRequestedOrientation(ActivityInfo.SCREEN_ORIENTATION_PORTRAIT);
         if (!enterAnimation) {
             runEnterTransition = true;
         }
@@ -136,11 +135,12 @@ public class VoIPWindowView extends FrameLayout {
 
                 }
             } else {
-                animationIndex = NotificationCenter.getInstance(UserConfig.selectedAccount).setAnimationInProgress(animationIndex, null);
+                int account = UserConfig.selectedAccount;
+                animationIndex = NotificationCenter.getInstance(account).setAnimationInProgress(animationIndex, null);
                 animate().translationX(getMeasuredWidth()).setListener(new AnimatorListenerAdapter() {
                     @Override
                     public void onAnimationEnd(Animator animation) {
-                        NotificationCenter.getInstance(UserConfig.selectedAccount).onAnimationFinish(animationIndex);
+                        NotificationCenter.getInstance(account).onAnimationFinish(animationIndex);
                         if (getParent() != null) {
                             activity.setRequestedOrientation(orientationBefore);
 
@@ -201,13 +201,14 @@ public class VoIPWindowView extends FrameLayout {
 
     public void requestFullscreen(boolean request) {
         if (request) {
-            setSystemUiVisibility(getSystemUiVisibility() | View.SYSTEM_UI_FLAG_FULLSCREEN);
+            setSystemUiVisibility(getSystemUiVisibility() | View.SYSTEM_UI_FLAG_FULLSCREEN | View.SYSTEM_UI_FLAG_LAYOUT_HIDE_NAVIGATION | View.SYSTEM_UI_FLAG_IMMERSIVE);
         } else {
             int flags = getSystemUiVisibility();
             flags &= ~View.SYSTEM_UI_FLAG_FULLSCREEN;
+            flags &= ~View.SYSTEM_UI_FLAG_LAYOUT_HIDE_NAVIGATION;
+            flags &= ~View.SYSTEM_UI_FLAG_IMMERSIVE;
             setSystemUiVisibility(flags);
         }
-
     }
 
     public void finishImmediate() {

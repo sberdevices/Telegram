@@ -35,6 +35,7 @@ import android.view.View;
 import android.view.ViewConfiguration;
 import android.view.ViewGroup;
 import android.view.ViewParent;
+import android.view.ViewPropertyAnimator;
 import android.view.accessibility.AccessibilityEvent;
 import android.widget.FrameLayout;
 
@@ -47,6 +48,7 @@ import java.lang.reflect.Field;
 import java.lang.reflect.Method;
 import java.util.ArrayList;
 
+import androidx.annotation.Nullable;
 import androidx.recyclerview.widget.LinearLayoutManager;
 import androidx.recyclerview.widget.RecyclerView;
 
@@ -120,6 +122,9 @@ public class RecyclerListView extends RecyclerView {
     private boolean hiddenByEmptyView;
     public boolean fastScrollAnimationRunning;
     private boolean animateEmptyView;
+    private int emptyViewAnimationType;
+    private int selectorRadius;
+    private int topBottomSelectorRadius;
 
     public interface OnItemClickListener {
         void onItemClick(View view, int position);
@@ -816,6 +821,7 @@ public class RecyclerListView extends RecyclerView {
             currentChildView = null;
             removeSelection(child, null);
         }
+        selectorRect.setEmpty();
         if (clickRunnable != null) {
             AndroidUtilities.cancelRunOnUIThread(clickRunnable);
             clickRunnable = null;
@@ -837,6 +843,10 @@ public class RecyclerListView extends RecyclerView {
         @Override
         public void onItemRangeInserted(int positionStart, int itemCount) {
             checkIfEmpty(true);
+            if (pinnedHeader != null && pinnedHeader.getAlpha() == 0) {
+                currentFirst = -1;
+                invalidateViews();
+            }
         }
 
         @Override
@@ -966,6 +976,14 @@ public class RecyclerListView extends RecyclerView {
         selectorType = type;
     }
 
+    public void setSelectorRadius(int radius) {
+        selectorRadius = radius;
+    }
+
+    public void setTopBottomSelectorRadius(int radius) {
+        topBottomSelectorRadius = radius;
+    }
+
     public void setDrawSelectorBehind(boolean value) {
         drawSelectorBehind = value;
     }
@@ -974,7 +992,11 @@ public class RecyclerListView extends RecyclerView {
         if (selectorDrawable != null) {
             selectorDrawable.setCallback(null);
         }
-        if (selectorType == 2) {
+        if (topBottomSelectorRadius > 0) {
+            selectorDrawable = Theme.createRadSelectorDrawable(color, topBottomSelectorRadius, topBottomSelectorRadius);
+        } else if (selectorRadius > 0) {
+            selectorDrawable = Theme.createSimpleSelectorRoundRectDrawable(selectorRadius, 0, color, 0xff000000);
+        } else if (selectorType == 2) {
             selectorDrawable = Theme.getSelectorDrawable(color, false);
         } else {
             selectorDrawable = Theme.createSelectorDrawable(color, selectorType);
@@ -1221,6 +1243,9 @@ public class RecyclerListView extends RecyclerView {
             emptyView.animate().setListener(null).cancel();
         }
         emptyView = view;
+        if (animateEmptyView && emptyView != null) {
+            emptyView.setVisibility(View.GONE);
+        }
         if (isHidden) {
             if (emptyView != null) {
                 emptyViewAnimateToVisibility = GONE;
@@ -1228,7 +1253,7 @@ public class RecyclerListView extends RecyclerView {
             }
         } else {
             emptyViewAnimateToVisibility = -1;
-            checkIfEmpty(false);
+            checkIfEmpty(isAttachedToWindow());
         }
     }
 
@@ -1342,9 +1367,9 @@ public class RecyclerListView extends RecyclerView {
             }
             return;
         }
-        boolean emptyViewVisible = getAdapter().getItemCount() == 0;
+        boolean emptyViewVisible = emptyViewIsVisible();
         int newVisibility = emptyViewVisible ? VISIBLE : GONE;
-        if (!animateEmptyView || !isAttachedToWindow()) {
+        if (!animateEmptyView) {
             animated = false;
         }
         if (animated) {
@@ -1355,11 +1380,19 @@ public class RecyclerListView extends RecyclerView {
                     if (emptyView.getVisibility() == GONE) {
                         emptyView.setVisibility(VISIBLE);
                         emptyView.setAlpha(0);
+                        if (emptyViewAnimationType == 1) {
+                            emptyView.setScaleX(0.7f);
+                            emptyView.setScaleY(0.7f);
+                        }
                     }
-                    emptyView.animate().alpha(1f).setDuration(150).start();
+                    emptyView.animate().alpha(1f).scaleX(1).scaleY(1).setDuration(150).start();
                 } else {
                     if (emptyView.getVisibility() != GONE) {
-                        emptyView.animate().alpha(0).setDuration(150).setListener(new AnimatorListenerAdapter() {
+                        ViewPropertyAnimator animator = emptyView.animate().alpha(0);
+                        if (emptyViewAnimationType == 1) {
+                            animator.scaleY(0.7f).scaleX(0.7f);
+                        }
+                        animator.setDuration(150).setListener(new AnimatorListenerAdapter() {
                             @Override
                             public void onAnimationEnd(Animator animation) {
                                 if (emptyView != null) {
@@ -1382,6 +1415,13 @@ public class RecyclerListView extends RecyclerView {
             }
             hiddenByEmptyView = true;
         }
+    }
+
+    protected boolean emptyViewIsVisible() {
+        if (getAdapter() == null || isFastScrollAnimationRunning()) {
+            return false;
+        }
+        return getAdapter().getItemCount() == 0;
     }
 
     public void hide() {
@@ -1488,7 +1528,9 @@ public class RecyclerListView extends RecyclerView {
         if (position != NO_POSITION) {
             selectorPosition = position;
         }
-
+        if (topBottomSelectorRadius > 0 && getAdapter() != null) {
+            Theme.setMaskDrawableRad(selectorDrawable, position == 0 ? topBottomSelectorRadius : 0, position == getAdapter().getItemCount() - 2 ? topBottomSelectorRadius : 0);
+        }
         selectorRect.set(sel.getLeft(), sel.getTop(), sel.getRight(), sel.getBottom() - bottomPadding);
 
         final boolean enabled = sel.isEnabled();
@@ -1724,7 +1766,7 @@ public class RecyclerListView extends RecyclerView {
                     View header = headers.get(a);
                     int saveCount = canvas.save();
                     int top = (Integer) header.getTag();
-                    canvas.translate(LocaleController.isRTL ? getWidth() - header.getWidth() : 0, top);
+                    canvas.translate(28, top + 4);
                     canvas.clipRect(0, 0, getWidth(), header.getMeasuredHeight());
                     header.draw(canvas);
                     canvas.restoreToCount(saveCount);
@@ -1820,8 +1862,9 @@ public class RecyclerListView extends RecyclerView {
         super.requestLayout();
     }
 
-    public void setAnimateEmptyView(boolean animate) {
+    public void setAnimateEmptyView(boolean animate, int emptyViewAnimationType) {
         animateEmptyView = animate;
+        this.emptyViewAnimationType = emptyViewAnimationType;
     }
 
     public static class FoucsableOnTouchListener implements OnTouchListener {
@@ -1853,6 +1896,14 @@ public class RecyclerListView extends RecyclerView {
                 parent.requestDisallowInterceptTouchEvent(false);
             }
             return false;
+        }
+    }
+
+    @Override
+    public void setTranslationY(float translationY) {
+        super.setTranslationY(translationY);
+        if (fastScroll != null) {
+            fastScroll.setTranslationY(translationY);
         }
     }
 }

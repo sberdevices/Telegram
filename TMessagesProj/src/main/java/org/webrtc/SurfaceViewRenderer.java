@@ -17,6 +17,7 @@ import android.os.Looper;
 import android.util.AttributeSet;
 import android.view.SurfaceHolder;
 import android.view.SurfaceView;
+import android.view.View;
 
 /**
  * Display the video stream on a SurfaceView.
@@ -40,6 +41,9 @@ public class SurfaceViewRenderer extends SurfaceView
   private boolean enableFixedSize;
   private int surfaceWidth;
   private int surfaceHeight;
+  private boolean isCamera;
+
+  private OrientationHelper orientationHelper;
 
   /**
    * Standard View constructor. In order to render something, you must first call init().
@@ -87,6 +91,19 @@ public class SurfaceViewRenderer extends SurfaceView
     eglRenderer.init(sharedContext, this /* rendererEvents */, configAttributes, drawer);
   }
 
+  public void setIsCamera(boolean value) {
+    isCamera = value;
+    if (!isCamera) {
+      orientationHelper = new OrientationHelper() {
+        @Override
+        protected void onOrientationUpdate(int orientation) {
+          updateRotation();
+        }
+      };
+      orientationHelper.start();
+    }
+  }
+
   /**
    * Block until any pending frame is returned and all GL resources released, even if an interrupt
    * occurs. If an interrupt occurs during release(), the interrupt flag will be set. This function
@@ -95,6 +112,48 @@ public class SurfaceViewRenderer extends SurfaceView
    */
   public void release() {
     eglRenderer.release();
+    if (orientationHelper != null) {
+      orientationHelper.stop();
+    }
+  }
+
+  private void updateRotation() {
+    if (orientationHelper == null || rotatedFrameWidth == 0 || rotatedFrameHeight == 0) {
+      return;
+    }
+    View parentView = (View) getParent();
+    if (parentView == null) {
+      return;
+    }
+    int orientation = orientationHelper.getOrientation();
+    float viewWidth = getMeasuredWidth();
+    float viewHeight = getMeasuredHeight();
+    float w;
+    float h;
+    float targetWidth = parentView.getMeasuredWidth();
+    float targetHeight = parentView.getMeasuredHeight();
+    if (orientation == 90 || orientation == 270) {
+      w = viewHeight;
+      h = viewWidth;
+    } else {
+      w = viewWidth;
+      h = viewHeight;
+    }
+    float scale;
+    if (w < h) {
+      scale = Math.max(w / viewWidth, h / viewHeight);
+    } else {
+      scale = Math.min(w / viewWidth, h / viewHeight);
+    }
+    w *= scale;
+    h *= scale;
+    if (Math.abs(w / h - targetWidth / targetHeight) < 0.1f) {
+      scale *= Math.max(targetWidth / w, targetHeight / h);
+    }
+    if (orientation == 270) {
+      orientation = -90;
+    }
+    animate().scaleX(scale).scaleY(scale).rotation(-orientation).setDuration(180).start();
   }
 
   /**
@@ -284,6 +343,10 @@ public class SurfaceViewRenderer extends SurfaceView
       updateSurfaceSize();
       requestLayout();
     });
+  }
+
+  public boolean isFirstFrameRendered() {
+    return eglRenderer.isFirstFrameRendered;
   }
 
   private void postOrRun(Runnable r) {

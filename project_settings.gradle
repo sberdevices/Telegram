@@ -1,0 +1,3 @@
+include ':telegram_calls'
+
+project(":telegram_calls").projectDir = file("$rootProject.projectDir/Apps/TelegramCalls/TMessagesProj")

@@ -1,0 +1,34 @@
+<?xml version="1.0" encoding="utf-8"?>
+<RelativeLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    xmlns:tools="http://schemas.android.com/tools"
+    android:layout_width="wrap_content"
+    android:layout_height="wrap_content">
+
+    <!-- закругленный аватар -->
+    <ru.sberdevices.sbdv.view.AvatarView
+        android:id="@+id/main_photo"
+        android:layout_width="176dp"
+        android:layout_height="176dp"
+        app:cardCornerRadius="88dp" />
+
+    <androidx.cardview.widget.CardView
+        android:id="@+id/card_bubble_info"
+        android:layout_width="48dp"
+        android:layout_height="48dp"
+        android:layout_alignEnd="@+id/main_photo"
+        android:layout_alignBottom="@+id/main_photo"
+        app:cardBackgroundColor="@color/card_red"
+        app:cardCornerRadius="24dp">
+
+        <TextView
+            android:id="@+id/card_bubble_info_text"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_gravity="center"
+            android:textColor="@color/white"
+            android:textAppearance="@style/TextAppearance.Sbdv.Subtitle2"
+            tools:text="2" />
+    </androidx.cardview.widget.CardView>
+
+</RelativeLayout>

@@ -1,0 +1,35 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <dimen name="av_default_border_width">2dp</dimen>
+    <dimen name="av_default_height">75dp</dimen>
+    <dimen name="av_default_width">75dp</dimen>
+
+    <dimen name="overlay_x">32dp</dimen>
+    <dimen name="overlay_y">32dp</dimen>
+
+    <dimen name="call_status_icon_size">24dp</dimen>
+    <dimen name="call_status_icon_paddind">10dp</dimen>
+
+    <dimen name="margin_default">44dp</dimen>
+    <dimen name="margin_default_half">8dp</dimen>
+    <dimen name="margin_default_double">56dp</dimen>
+
+    <dimen name="font_dialog_title">48sp</dimen>
+    <dimen name="font_dialog_body">32sp</dimen>
+    <dimen name="font_dialog_body_min">16sp</dimen>
+
+    <dimen name="sbdv_dialog_card_width">624dp</dimen>
+    <dimen name="sbdv_dialog_card_height">624dp</dimen>
+    <dimen name="sbdv_dialog_card_radius">40dp</dimen>
+    <dimen name="sbdv_dialog_subtitle_max_height">200dp</dimen>
+    <dimen name="sbdv_dialog_content_max_height">350dp</dimen>
+
+    <dimen name="sbdv_logout_popup_margin_end">540dp</dimen>
+    <dimen name="sbdv_logout_popup_margin_top">72dp</dimen>
+
+    <dimen name="sbdv_widget_selector_padding">-8dp</dimen>
+    <dimen name="sbdv_widget_selector_width">4dp</dimen>
+    <dimen name="sbdv_widget_selector_corner_radius">46dp</dimen>
+
+    <dimen name="sbdv_status_bar_button_radius">40dp</dimen>
+</resources>

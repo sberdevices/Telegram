@@ -11,19 +11,23 @@
 
     <!--THEMES-->
 
-    <style name="Theme.TMessages.Start" parent="@android:style/Theme.Material">
+    <style name="Theme.TMessages.Start" parent="@style/Theme.AppCompat.NoActionBar">
         <item name="android:actionBarStyle">@style/ActionBar.Transparent.TMessages.Start</item>
         <item name="android:colorBackground">@android:color/white</item>
-        <item name="android:windowBackground">@android:color/white</item>
         <item name="android:windowContentOverlay">@null</item>
         <item name="android:colorPrimaryDark">#426482</item>
         <item name="android:colorPrimary">#527da3</item>
         <item name="android:navigationBarColor">#000000</item>
         <item name="android:textViewStyle">@style/MyTextViewStyle</item>
         <item name="android:forceDarkAllowed">false</item>
+
+        <!-- Remove white bg on start -->
+        <item name="android:windowDisablePreview">true</item>
+        <item name="android:windowBackground">@null</item>
+        <item name="android:windowIsTranslucent">true</item>
     </style>
 
-    <style name="Theme.TMessages" parent="@android:style/Theme.Material.Light">
+    <style name="Theme.TMessages" parent="@style/Theme.AppCompat.Light.NoActionBar">
         <item name="android:windowActionBar">false</item>
         <item name="android:windowNoTitle">true</item>
         <item name="android:windowActionBarOverlay">false</item>

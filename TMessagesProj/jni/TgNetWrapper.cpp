@@ -80,6 +80,10 @@ jint getCurrentTime(JNIEnv *env, jclass c, jint instanceNum) {
     return ConnectionsManager::getInstance(instanceNum).getCurrentTime();
 }
 
+jint getCurrentDatacenterId(JNIEnv *env, jclass c, jint instanceNum) {
+    return ConnectionsManager::getInstance(instanceNum).getCurrentDatacenterId();
+}
+
 jint isTestBackend(JNIEnv *env, jclass c, jint instanceNum) {
     return ConnectionsManager::getInstance(instanceNum).isTestBackend() ? 1 : 0;
 }
@@ -139,7 +143,7 @@ void cancelRequest(JNIEnv *env, jclass c, jint instanceNum, jint token, jboolean
 }
 
 void cleanUp(JNIEnv *env, jclass c, jint instanceNum, jboolean resetKeys) {
-    return ConnectionsManager::getInstance(instanceNum).cleanUp(resetKeys);
+    return ConnectionsManager::getInstance(instanceNum).cleanUp(resetKeys, -1);
 }
 
 void cancelRequestsForGuid(JNIEnv *env, jclass c, jint instanceNum, jint guid) {
@@ -424,6 +428,7 @@ static const char *ConnectionsManagerClassPathName = "org/telegram/tgnet/Connect
 static JNINativeMethod ConnectionsManagerMethods[] = {
         {"native_getCurrentTimeMillis", "(I)J", (void *) getCurrentTimeMillis},
         {"native_getCurrentTime", "(I)I", (void *) getCurrentTime},
+        {"native_getCurrentDatacenterId", "(I)I", (void *) getCurrentDatacenterId},
         {"native_isTestBackend", "(I)I", (void *) isTestBackend},
         {"native_getTimeDifference", "(I)I", (void *) getTimeDifference},
         {"native_sendRequest", "(IJLorg/telegram/tgnet/RequestDelegateInternal;Lorg/telegram/tgnet/QuickAckDelegate;Lorg/telegram/tgnet/WriteToSocketDelegate;IIIZI)V", (void *) sendRequest},

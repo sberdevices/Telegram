@@ -333,7 +333,7 @@ public class VoIPFloatingLayout extends FrameLayout {
         float maxBottom = (Build.VERSION.SDK_INT < Build.VERSION_CODES.KITKAT_WATCH || lastInsets == null ? 0 : lastInsets.getSystemWindowInsetBottom() + bottomPadding);
 
         float xPoint = leftPadding + (((View) parent).getMeasuredWidth() - leftPadding - rightPadding - width) * xRelative;
-        float yPoint = maxTop + (((View) parent).getMeasuredHeight() - maxBottom - maxTop - height) * yRelative;
+        float yPoint = maxTop;
 
         if (animated) {
             animate().setListener(null).cancel();

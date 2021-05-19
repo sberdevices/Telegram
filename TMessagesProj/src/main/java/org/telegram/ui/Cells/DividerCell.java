@@ -20,6 +20,9 @@ public class DividerCell extends View {
     public DividerCell(Context context) {
         super(context);
         setPadding(0, AndroidUtilities.dp(8), 0, AndroidUtilities.dp(8));
+        if (Theme.dividerPaint == null) {
+            Theme.createCommonResources(context);
+        }
     }
 
     @Override

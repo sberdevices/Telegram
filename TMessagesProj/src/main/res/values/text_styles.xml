@@ -1,0 +1,54 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+
+    <style name="TextAppearance.Sbdv.BigTitle" parent="TextAppearance.AppCompat.Title">
+        <item name="android:fontFamily">@font/sb_sans</item>
+        <item name="fontFamily">@font/sb_sans</item>
+        <item name="android:textSize">42sp</item>
+        <item name="android:letterSpacing">-0.02</item>
+    </style>
+
+    <style name="TextAppearance.Sbdv.Title" parent="TextAppearance.AppCompat.Title">
+        <item name="android:fontFamily">@font/sb_sans</item>
+        <item name="fontFamily">@font/sb_sans</item>
+        <item name="android:textSize">32sp</item>
+        <item name="android:letterSpacing">-0.02</item>
+        <item name="android:lineSpacingMultiplier">1.2</item>
+    </style>
+
+    <style name="TextAppearance.Sbdv.Subtitle1" parent="TextAppearance.AppCompat.Title">
+        <item name="android:fontFamily">@font/sb_sans</item>
+        <item name="fontFamily">@font/sb_sans</item>
+        <item name="android:textSize">28sp</item>
+        <item name="android:letterSpacing">-0.02</item>
+    </style>
+
+    <style name="TextAppearance.Sbdv.Subtitle2" parent="TextAppearance.AppCompat.Title">
+        <item name="android:fontFamily">@font/sb_sans</item>
+        <item name="fontFamily">@font/sb_sans</item>
+        <item name="android:textSize">26sp</item>
+    </style>
+
+    <style name="TextAppearance.Sbdv.Button" parent="TextAppearance.AppCompat.Title">
+        <item name="android:fontFamily">@font/sb_sans</item>
+        <item name="fontFamily">@font/sb_sans</item>
+        <item name="android:textSize">28sp</item>
+        <item name="textAllCaps">false</item>
+    </style>
+
+    <style name="TextAppearance.Sbdv.Body1" parent="TextAppearance.AppCompat.Body1">
+        <item name="android:fontFamily">@font/sb_sans</item>
+        <item name="fontFamily">@font/sb_sans</item>
+        <item name="android:textSize">24sp</item>
+    </style>
+
+    <style name="TextAppearance.Sbdv.Body1.Bold">
+        <item name="android:textStyle">bold</item>
+    </style>
+
+    <style name="TextAppearance.Sbdv.Caption" parent="TextAppearance.AppCompat.Caption">
+        <item name="android:fontFamily">@font/sb_sans</item>
+        <item name="fontFamily">@font/sb_sans</item>
+        <item name="android:textSize">20sp</item>
+    </style>
+</resources>

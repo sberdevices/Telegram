@@ -1,0 +1,32 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="sbdv_contacts">Контакты</string>
+    <string name="sbdv_recents">Последние</string>
+    <string name="sbdv_logout">Выйти из аккаунта</string>
+
+    <string name="sbdv_accept">Ответить</string>
+    <string name="sbdv_decline">Отклонить</string>
+    <string name="sbdv_end_call">Завершить</string>
+    <string name="sbdv_search">Поиск</string>
+    <string name="sbdv_incoming_call">Входящий вызов</string>
+
+    <string name="sbdv_no_recent_calls">Вы еще никому не звонили</string>
+    <string name="sbdv_time_to_say_salute">Самое время сказать: «Салют, позвони Васе»</string>
+    <string name="sbdv_no_name_matches">Не нашли никого с таким именем</string>
+    <string name="sbdv_who_do_you_want_call">Кому вы хотите позвонить?</string>
+    <string name="sbdv_no_contacts">У вас нет контактов</string>
+
+    <string name="sbdv_thanks_for_rating">Спасибо за оценку!</string>
+    <string name="sbdv_rate_call_quality">Оцените качество звонка</string>
+    <string name="sbdv_choose_number">Назовите цифру от 1 до 5</string>
+    <string name="sbdv_what_didnt_like">Что вам не понравилось?</string>
+    <string name="sbdv_specify_rating">Пожалуйста, уточните вашу оценку</string>
+    <string name="sbdv_skip">Пропустить</string>
+    <string name="sbdv_send">Отправить</string>
+    <string name="sbdv_further">Далее</string>
+
+    <string name="sbdv_bad_sound">Плохой звук</string>
+    <string name="sbdv_bad_image">Плохая картинка</string>
+    <string name="sbdv_other_problem">Другая проблема</string>
+
+</resources>

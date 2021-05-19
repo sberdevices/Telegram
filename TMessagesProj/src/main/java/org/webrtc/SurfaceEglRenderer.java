@@ -29,7 +29,7 @@ public class SurfaceEglRenderer extends EglRenderer implements SurfaceHolder.Cal
 
   private final Object layoutLock = new Object();
   private boolean isRenderingPaused;
-  private boolean isFirstFrameRendered;
+  public boolean isFirstFrameRendered;
   private int rotatedFrameWidth;
   private int rotatedFrameHeight;
   private int frameRotation;

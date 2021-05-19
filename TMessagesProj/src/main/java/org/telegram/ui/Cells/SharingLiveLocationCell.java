@@ -54,7 +54,7 @@ public class SharingLiveLocationCell extends FrameLayout {
     private LocationActivity.LiveLocation liveLocation;
     private Location location = new Location("network");
 
-    private int currentAccount;
+    private int currentAccount = UserConfig.selectedAccount;
 
     private Runnable invalidateRunnable = new Runnable() {
         @Override
@@ -84,7 +84,7 @@ public class SharingLiveLocationCell extends FrameLayout {
 
             distanceTextView = new SimpleTextView(context);
             distanceTextView.setTextSize(14);
-            distanceTextView.setTextColor(Theme.getColor(Theme.key_windowBackgroundWhiteGrayText2));
+            distanceTextView.setTextColor(Theme.getColor(Theme.key_windowBackgroundWhiteGrayText3));
             distanceTextView.setGravity(LocaleController.isRTL ? Gravity.RIGHT : Gravity.LEFT);
 
             addView(distanceTextView, LayoutHelper.createFrame(LayoutHelper.MATCH_PARENT, 20, Gravity.TOP | (LocaleController.isRTL ? Gravity.RIGHT : Gravity.LEFT), LocaleController.isRTL ? padding : 73, 37, LocaleController.isRTL ? 73 : padding, 0));
@@ -142,12 +142,14 @@ public class SharingLiveLocationCell extends FrameLayout {
     }
 
     public void setDialog(MessageObject messageObject, Location userLocation) {
-        int fromId = messageObject.messageOwner.from_id;
+        int fromId = messageObject.getFromChatId();
         if (messageObject.isForwarded()) {
-            if (messageObject.messageOwner.fwd_from.channel_id != 0) {
-                fromId = -messageObject.messageOwner.fwd_from.channel_id;
-            } else {
-                fromId = messageObject.messageOwner.fwd_from.from_id;
+            if (messageObject.messageOwner.fwd_from.from_id instanceof TLRPC.TL_peerChannel) {
+                fromId = -messageObject.messageOwner.fwd_from.from_id.channel_id;
+            } else if (messageObject.messageOwner.fwd_from.from_id instanceof TLRPC.TL_peerChat) {
+                fromId = -messageObject.messageOwner.fwd_from.from_id.chat_id;
+            } else if (messageObject.messageOwner.fwd_from.from_id instanceof TLRPC.TL_peerUser) {
+                fromId = messageObject.messageOwner.fwd_from.from_id.user_id;
             }
         }
         currentAccount = messageObject.currentAccount;

@@ -1,4 +1,37 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <color name="divider">#dcdcdc</color>
+
+    <color name="white">#ffffff</color>
+    <color name="white_alpha_90">#90ffffff</color>
+    <color name="white_alpha_96">#F5FFFFFF</color>
+    <color name="nice_red">#A2174C</color>
+    <color name="card_text_white">#A3FFFFFF</color>
+    <color name="card_gray">#5D6D79</color>
+    <color name="card_red">#FF3B3B</color>
+    <color name="card_salmon_pearl_red">#ED505A</color>
+    <color name="transparent">#00000000</color>
+
+    <color name="card_background">#1FFFFFFF</color>
+
+    <color name="av_default_border">@android:color/white</color>
+    <color name="av_bitmap_background_color">#424242</color>
+
+    <color name="sbdv_white">#ffffff</color>
+    <color name="sbdv_white_05">#0DFFFFFF</color>
+    <color name="sbdv_white_8">#08FFFFFF</color>
+    <color name="sbdv_white_10">#1FFFFFFF</color>
+    <color name="sbdv_white_28">#47FFFFFF</color>
+    <color name="sbdv_white_56">#8FFFFFFF</color>
+    <color name="sbdv_white_64">#A3FFFFFF</color>
+    <color name="sbdv_green">#12A557</color>
+    <color name="sbdv_green_pressed">#0F954E</color>
+    <color name="sbdv_red">#ED505A</color>
+    <color name="sbdv_red_pressed">#C63841</color>
+    <color name="sbdv_menu_background">#1A1A1A</color>
+    <color name="sbdv_black">#080808</color>
+
+    <color name="sbdv_widget_background">#0FFFFFFF</color>
+    <color name="sbdv_widget_selector">#FF8BE786</color>
+
 </resources>

@@ -1,0 +1,109 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="@drawable/sbdv_background"
+    android:gravity="center"
+    android:orientation="vertical">
+
+    <TextView
+        android:id="@+id/title_tv"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="16dp"
+        android:fontFamily="@font/sb_sans_regular"
+        android:text="@string/sbdv_rate_call_quality"
+        android:textColor="@color/white"
+        android:textSize="44sp"
+        android:textStyle="bold" />
+
+    <TextView
+        android:id="@+id/description_tv"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="18dp"
+        android:fontFamily="@font/sb_sans_regular"
+        android:text="@string/sbdv_choose_number"
+        android:textColor="@color/sbdv_white_56"
+        android:textSize="28sp" />
+
+    <org.telegram.ui.Components.BetterRatingView
+        android:id="@+id/call_rating_view"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="52dp" />
+
+    <LinearLayout
+        android:id="@+id/problems_layout"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="52dp"
+        android:gravity="center"
+        android:visibility="gone"
+        tools:visibility="visible">
+
+        <ToggleButton
+            android:id="@+id/bad_sound_toggle"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_margin="12dp"
+            android:background="@drawable/sbdv_toggle_button_background"
+            android:paddingHorizontal="24dp"
+            android:paddingVertical="14dp"
+            android:textAllCaps="false"
+            android:foreground="@drawable/sbdv_selector_focusable_button_24"
+            android:textColor="@drawable/sbdv_toggle_text_selector"
+            android:textOff="@string/sbdv_bad_sound"
+            android:textOn="@string/sbdv_bad_sound"
+            android:textSize="28sp"
+            tools:checked="true" />
+
+        <ToggleButton
+            android:id="@+id/bad_image_toggle"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_margin="12dp"
+            android:foreground="@drawable/sbdv_selector_focusable_button_24"
+            android:background="@drawable/sbdv_toggle_button_background"
+            android:paddingHorizontal="24dp"
+            android:paddingVertical="14dp"
+            android:textAllCaps="false"
+            android:textColor="@drawable/sbdv_toggle_text_selector"
+            android:textOff="@string/sbdv_bad_image"
+            android:textOn="@string/sbdv_bad_image"
+            android:textSize="28sp" />
+
+        <Button
+            android:id="@+id/other_problem_button"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_margin="12dp"
+            android:foreground="@drawable/sbdv_selector_focusable_button_24"
+            android:background="@drawable/sbdv_toggle_button_selector"
+            android:paddingHorizontal="24dp"
+            android:paddingVertical="14dp"
+            android:text="@string/sbdv_other_problem"
+            android:textAllCaps="false"
+            android:textColor="@drawable/sbdv_toggle_text_selector"
+            android:textSize="28sp" />
+
+    </LinearLayout>
+
+    <Button
+        android:id="@+id/rate_skip_button"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginBottom="30dp"
+        android:layout_marginTop="96dp"
+        android:background="@drawable/sbdv_neutral_btn_r24_background"
+        android:fontFamily="@font/sb_sans_regular"
+        android:foreground="@drawable/sbdv_selector_focusable_button_24"
+        android:paddingHorizontal="72dp"
+        android:text="@string/sbdv_skip"
+        android:paddingVertical="18dp"
+        android:textAllCaps="false"
+        android:textColor="@color/white"
+        android:textSize="28sp" />
+
+</LinearLayout>

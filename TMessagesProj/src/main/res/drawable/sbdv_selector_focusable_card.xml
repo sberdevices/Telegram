@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="utf-8"?>
+<selector xmlns:android="http://schemas.android.com/apk/res/android">
+    <item android:state_focused="true">
+        <layer-list>
+            <item
+                android:top="@dimen/sbdv_widget_selector_padding"
+                android:bottom="@dimen/sbdv_widget_selector_padding"
+                android:left="@dimen/sbdv_widget_selector_padding"
+                android:right="@dimen/sbdv_widget_selector_padding">
+
+                <shape android:shape="rectangle">
+                    <stroke android:width="@dimen/sbdv_widget_selector_width" android:color="@color/sbdv_widget_selector" />
+                    <corners android:radius="@dimen/sbdv_widget_selector_corner_radius" />
+                </shape>
+            </item>
+        </layer-list>
+    </item>
+</selector>

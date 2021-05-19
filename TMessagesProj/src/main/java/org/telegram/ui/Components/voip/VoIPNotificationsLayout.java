@@ -12,6 +12,7 @@ import android.transition.TransitionManager;
 import android.transition.TransitionSet;
 import android.transition.TransitionValues;
 import android.transition.Visibility;
+import android.util.TypedValue;
 import android.view.Gravity;
 import android.view.View;
 import android.view.ViewGroup;
@@ -79,6 +80,7 @@ public class VoIPNotificationsLayout extends LinearLayout {
         view.iconView.setImageResource(iconRes);
         view.textView.setText(text);
         viewsByTag.put(tag, view);
+        view.setFocusable(NOT_FOCUSABLE);
 
         if (animated) {
             view.startAnimation();
@@ -197,7 +199,7 @@ public class VoIPNotificationsLayout extends LinearLayout {
 
             textView = new TextView(context);
             textView.setTextColor(Color.WHITE);
-            textView.setTextSize(14);
+            textView.setTextSize(TypedValue.COMPLEX_UNIT_DIP, 14);
             addView(textView, LayoutHelper.createFrame(LayoutHelper.WRAP_CONTENT, LayoutHelper.WRAP_CONTENT, Gravity.CENTER_VERTICAL, 44, 4, 16, 4));
         }
 
