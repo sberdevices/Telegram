@@ -1,5 +1,6 @@
 package ru.sberdevices.sbdv
 
+import android.annotation.SuppressLint
 import android.content.Context
 import com.google.android.exoplayer2.util.Log
 import ru.sberdevices.analytics.Analytics
@@ -9,16 +10,23 @@ import ru.sberdevices.sbdv.appstate.AppStateRepository
 import ru.sberdevices.sbdv.config.Config
 import ru.sberdevices.sbdv.config.LocalConfig
 import ru.sberdevices.sbdv.contacts.ContactsRepository
+import ru.sberdevices.sbdv.util.AnalyticsStub
 import ru.sberdevices.sbdv.util.CallManagerStub
 import ru.sberdevices.sbdv.util.DreamingEventsReceiver
+import ru.sberdevices.sbdv.util.VoiceQualityEnhancerStub
 import ru.sberdevices.sbdv.viewmodel.VoIPModel
+import ru.sberdevices.sdk.echocancel.VoiceQualityEnhancer
+import ru.sberdevices.sdk.echocancel.VoiceQualityEnhancerFactory
 import ru.sberdevices.services.calls.CallManager
 import ru.sberdevices.services.calls.CallManagerFactory
 import ru.sberdevices.settings.Settings
 
+private const val TAG = "SbdvServiceLocator"
+
 /**
  * Self-made simple ServiceLocator instead of using DI
  */
+@SuppressLint("StaticFieldLeak")
 object SbdvServiceLocator {
 
     private lateinit var context: Context
@@ -31,7 +39,14 @@ object SbdvServiceLocator {
         config
     }
 
-    private val analytics: Analytics by lazy { Analytics.create(context) }
+    private val analytics: Analytics by lazy {
+        try {
+            Analytics.create(context)
+        } catch (t: Throwable) {
+            Log.w(TAG, "AnalyticsStub created instead of a real one")
+            AnalyticsStub()
+        }
+    }
 
     private val analyticsSdk by lazy { AnalyticsCollectorFactory.getAnalyticsSdk(analytics) }
 
@@ -75,9 +90,19 @@ object SbdvServiceLocator {
     fun getCallManager(): CallManager {
         return try {
             CallManagerFactory.create(context)
-        } catch (e: SecurityException) {
-            Log.w("SbdvServiceLocator", "CallManagerStub created instead of a real one")
+        } catch (t: Throwable) {
+            Log.w(TAG, "CallManagerStub created instead of a real one")
             CallManagerStub()
+        }
+    }
+
+    @JvmStatic
+    fun getVoiceQualityEnhancer(): VoiceQualityEnhancer {
+        return try {
+            VoiceQualityEnhancerFactory.create(context)
+        } catch (t: Throwable) {
+            Log.w(TAG, "VoiceQualityEnhancerStub created instead of a real one")
+            VoiceQualityEnhancerStub()
         }
     }
 }

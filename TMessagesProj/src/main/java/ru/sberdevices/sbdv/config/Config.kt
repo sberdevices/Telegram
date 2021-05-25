@@ -16,7 +16,6 @@ import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.onEach
 import org.json.JSONException
 import org.json.JSONObject
-import ru.sberdevices.appconfig.ApplicationConfigProvider
 
 private val DEFAULT_CROP_RESOLUTION = Size(736, 414)
 
@@ -32,7 +31,12 @@ class Config(private val context: Context) {
     private var _voipCropResolution = DEFAULT_CROP_RESOLUTION
 
     private val applicationConfigProvider by lazy {
-        ApplicationConfigProvider.create(context.applicationContext)
+        try {
+            AppConfigProviderImpl(context.applicationContext)
+        } catch (t: Throwable) {
+            Log.w(TAG, "AppConfigProviderStub created instead of a real one")
+            AppConfigProviderStub()
+        }
     }
 
     private val configChangesFlow by lazy {

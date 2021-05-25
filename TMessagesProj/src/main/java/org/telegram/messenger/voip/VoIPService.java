@@ -477,10 +477,10 @@ public class VoIPService extends VoIPBaseService {
     public void onCreate() {
         super.onCreate();
 
-		voiceQualityEnhancer = VoiceQualityEnhancerFactory.create(this);
+		voiceQualityEnhancer = SbdvServiceLocator.getVoiceQualityEnhancer();
 
 		cvApiFactory = new CvApiFactoryImpl(this, new BindingIdStorageImpl());
-		callManager = CallManagerFactory.create(this);
+		callManager = SbdvServiceLocator.getCallManager();
 		callManager.addListener(callManagerListener);
 
 		stateRepository.setCallStateProvider(stateProvider);
